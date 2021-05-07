@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 """@author: ambakick
 """
-
+import sys
 import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
@@ -267,21 +267,31 @@ if __name__ == "__main__":
         while(True):
             #msg = lastMsg
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
-            msg2=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
+            data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
             #print('get img encoding : '+str(msg.encoding))
             #np_arr=np.fromstring(msg.data,np.uint8)
             #cap = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') 
             #ret, img = cap.read()
             img=ncv2.imgmsg_to_cv2(msg)
-            img2=ncv2.imgmsg_to_cv2(msg2)
+            cv_image = ncv2.imgmsg_to_cv2(data, data.encoding)
 
-            pix=(msg2.width/2, msg2.height/2)
+            #pix=(msg2.width/2, msg2.height/2)
             #print('Depth at center- ' + str(img2[pix[1], pix[0]]))
             #ret, img=cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             #print(img)
+
+            pix = (data.width / 2, data.height / 2)
+            print(str(pix[0]))
+            print(str(pix[1]))
+            print(str(cv_image[int(pix[1]), int(pix[0])]))
+            print("yeah")
+            #sys.stdout.write(
+            #    'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], cv_image[pix[1], pix[0]]))
+            #sys.stdout.flush()
             
             np.asarray(img)
             new_img = pipeline(img)
+            #cv2.imshow("frame2", img2)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             
