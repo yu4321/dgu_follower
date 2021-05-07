@@ -107,12 +107,12 @@ def pipeline(img):
     
     frame_count+=1
 
-    print('entered pipeline')
+    #print('entered pipeline')
     
     img_dim = (img.shape[1], img.shape[0])
     z_box = det.get_localization(img) # measurement
     if len(z_box) <=0 :
-        print('z_box empty')
+        #print('z_box empty')
         currentFollow=-1
         cv2.imshow('frame',img)
         return img
@@ -281,13 +281,9 @@ if __name__ == "__main__":
             #print(img)
 
             pix = (data.width / 2, data.height / 2)
-            print(str(pix[0]))
-            print(str(pix[1]))
-            print(str(cv_image[int(pix[1]), int(pix[0])]))
-            print("yeah")
-            #sys.stdout.write(
-            #    'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], cv_image[pix[1], pix[0]]))
-            #sys.stdout.flush()
+            sys.stdout.write(
+                'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], cv_image[int(pix[1]), int(pix[0])]))
+            sys.stdout.flush()
             
             np.asarray(img)
             new_img = pipeline(img)

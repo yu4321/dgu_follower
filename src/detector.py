@@ -120,7 +120,7 @@ class PersonDetector(object):
               idx_vec = [i for i, v in enumerate(cls) if ((v==1) and (scores[i]>0.3))]
               
               if len(idx_vec) ==0:
-                  print('no detection!')
+                  #print('no detection!')
                   if self.car_boxes is not None:
                     self.car_boxes.clear()
               else:
