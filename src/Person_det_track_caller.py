@@ -93,7 +93,7 @@ def assign_detections_to_trackers(trackers, detections, iou_thrd = 0.3):
     
 
 
-def pipeline(img):
+def pipeline(img, distance):
     '''
     Pipeline function for detection and tracking
     '''
@@ -104,7 +104,8 @@ def pipeline(img):
     global track_id_list
     global debug
     global currentFollow
-    
+
+    #print('distnace : '+str(distance))
     frame_count+=1
 
     #print('entered pipeline')
@@ -223,15 +224,21 @@ def pipeline(img):
     
     cv2.imshow("frame", img)
     print('target position - '+str(pos))
-    #drive(pos)
+    dst=float(distance)
+    drive(pos, dst)
     return img
 
-def drive(self, pos):
+def drive(pos, distance):
+    global move
     if pos!=0:
         move.linear.x=0.5
     else:
         move.linear.x=0
-    move.angular.z=pos * -1
+    move.angular.z=pos * -0.5
+
+    if(distance > 1000):
+        print("so close. stop")
+        move.linear.x=0
     pub.publish(move)
 
 def image_callback(self, msg):
@@ -286,7 +293,7 @@ if __name__ == "__main__":
             sys.stdout.flush()
             
             np.asarray(img)
-            new_img = pipeline(img)
+            new_img = pipeline(img, cv_image[int(pix[1]), int(pix[0])])
             #cv2.imshow("frame2", img2)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
