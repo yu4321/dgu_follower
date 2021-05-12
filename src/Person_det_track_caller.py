@@ -201,8 +201,12 @@ def pipeline(img, distance):
 
              if(pos==0):
                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-                center = left+ ((left-right)/2)
-                pos = center/(W/2)
+                center = left+ ((right-left)/2)
+                posProto=center-(W/2)
+                pos = posProto/(W/2)
+
+                print('center: ',center, "half width: ",W/2, ", posProto: ", posProto, ", pos: ", pos)
+                #pos = center/(W/2)
 
                 if driveMode == True:
                     if(currentFollow==-1):
@@ -295,6 +299,8 @@ if __name__ == "__main__":
             #print(img)
 
             pix = (data.width / 2, data.height / 2)
+            W=int(data.width)
+            H=int(data.height)
             sys.stdout.write(
                 'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], cv_image[int(pix[1]), int(pix[0])]))
             sys.stdout.flush()
