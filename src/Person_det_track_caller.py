@@ -22,7 +22,7 @@ import tracker
 import cv2
 
 
-W = 848
+W = 640
 H = 480
 
 # Global variables to be used by funcitons of VideoFileClop
@@ -84,7 +84,7 @@ def assign_detections_to_trackers(trackers, detections, iou_thrd = 0.3):
         else:
             matches.append(m.reshape(1,2))
     
-    if(len(matches)==0):
+    if (len(matches) == 0):
         matches = np.empty((0,2),dtype=int)
     else:
         matches = np.concatenate(matches,axis=0)
@@ -203,13 +203,19 @@ def pipeline(img, distance):
                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
                 center = left+ ((left-right)/2)
                 pos = center/(W/2)
-                if(currentFollow==-1):
-                    currentFollow=trk.id
-                    print('set target: id : '+str(trk.id))
+
+                if driveMode == True:
+                    if(currentFollow==-1):
+                        currentFollow=trk.id
+                        print('set target: id : '+str(trk.id))
+                    else:
+                        if currentFollow!=trk.id:
+                            print('not target. pass id : '+str(trk.id))
+                            pos=0
                 else:
-                    if currentFollow!=trk.id:
-                        print('not target. pass id : '+str(trk.id))
-                        pos=0
+                    print('not drive Mode. set target none')
+                    currentFollow=-1
+                    pos=0
     # Book keeping
     deleted_tracks = filter(lambda x: x.no_losses >max_age, tracker_list)
     
@@ -236,7 +242,7 @@ def drive(pos, distance):
         move.linear.x=0
     move.angular.z=pos * -0.5
 
-    if(distance > 1000):
+    if(distance < 500):
         print("so close. stop")
         move.linear.x=0
     pub.publish(move)
@@ -245,6 +251,7 @@ def image_callback(self, msg):
 	lastMsg=msg
 if __name__ == "__main__":    
     currentFollow=-1
+    driveMode=False
     det = detector.PersonDetector()
 
     if debug: # test on a sequence of images
@@ -295,9 +302,15 @@ if __name__ == "__main__":
             np.asarray(img)
             new_img = pipeline(img, cv_image[int(pix[1]), int(pix[0])])
             #cv2.imshow("frame2", img2)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+
+            pressed = cv2.waitKey(1) & 0xFF
+            if pressed== ord('q'):
+                print('exit with q')
                 break
-            
+            if pressed == ord('s'):
+                driveMode= not driveMode
+                print('drive mode change to '+str(driveMode))
+
         cap.release()
         cv2.destroyAllWindows()
         print(round(end-start, 2), 'Seconds to finish')
