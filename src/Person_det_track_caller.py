@@ -91,9 +91,15 @@ def assign_detections_to_trackers(trackers, detections, iou_thrd = 0.3):
     
     return matches, np.array(unmatched_detections), np.array(unmatched_trackers)       
     
+def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
+    cuttedD=depth_image[top:bottom, left:right]
+    cuttedO=image[top:bottom, left:right]
+    cv2.imshow("or",cuttedO)
+    cv2.imshow("dp",cuttedD)
 
 
-def pipeline(img, distance):
+
+def pipeline(img, depth_img, distance):
     '''
     Pipeline function for detection and tracking
     '''
@@ -201,6 +207,9 @@ def pipeline(img, distance):
 
              if(pos==0):
                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+                if(left-right <=0):
+                    continue
+                get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
                 center = left+ ((right-left)/2)
                 posProto=center-(W/2)
                 pos = posProto/(W/2)
@@ -306,7 +315,7 @@ if __name__ == "__main__":
             sys.stdout.flush()
             
             np.asarray(img)
-            new_img = pipeline(img, cv_image[int(pix[1]), int(pix[0])])
+            new_img = pipeline(img, cv_image, cv_image[int(pix[1]), int(pix[0])])
             #cv2.imshow("frame2", img2)
 
             pressed = cv2.waitKey(1) & 0xFF
