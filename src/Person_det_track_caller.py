@@ -92,10 +92,29 @@ def assign_detections_to_trackers(trackers, detections, iou_thrd = 0.3):
     return matches, np.array(unmatched_detections), np.array(unmatched_trackers)       
     
 def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
+    if image is None :
+        print('image not true. break')
+        return
+    if depth_image is None:
+        print('depth image not True, break')
+        return
     cuttedD=depth_image[top:bottom, left:right]
     cuttedO=image[top:bottom, left:right]
-    cv2.imshow("or",cuttedO)
-    cv2.imshow("dp",cuttedD)
+
+    if image is None:
+        print('image2 not true. break')
+        return
+    if depth_image is None:
+        print('depth image2 not True, break')
+        return
+    print('cuttedD : ',len(cuttedD), ' cuttedO : ', len(cuttedO))
+
+    try:
+        cv2.imshow("or",cuttedO)
+        cv2.imshow("dp",cuttedD)
+    except:
+        print('show error')
+        #cv2.imshow("or", )
 
 
 
@@ -207,9 +226,12 @@ def pipeline(img, depth_img, distance):
 
              if(pos==0):
                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-                if(left-right <=0):
+                if((right-left)  * (bottom - top) <=0) :
+                    print('size of square smaller than 0. skip')
                     continue
-                get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
+                #if(left-right <=0):
+                #    continue
+
                 center = left+ ((right-left)/2)
                 posProto=center-(W/2)
                 pos = posProto/(W/2)
@@ -229,6 +251,12 @@ def pipeline(img, depth_img, distance):
                     print('not drive Mode. set target none')
                     currentFollow=-1
                     pos=0
+                    get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
+             else:
+                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+                 if ((right - left) * (bottom - top) <= 0):
+                     print('size of square smaller than 0. skip')
+                     continue
     # Book keeping
     deleted_tracks = filter(lambda x: x.no_losses >max_age, tracker_list)
     
