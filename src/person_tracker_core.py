@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
@@ -39,7 +41,8 @@ class PersonTrackerCore:
         img_dim = (img.shape[1], img.shape[0])
         z_box = self.det.get_localization(img)  # measurement
         if len(z_box) <= 0:
-            return []
+            good_tracker_list.clear()
+            return good_tracker_list
 
         x_box = []
 

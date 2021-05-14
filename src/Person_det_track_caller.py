@@ -43,6 +43,7 @@ debug = False
 
 currentFollow = int
 
+trackerCore=tcore.PersonTrackerCore()
 ncv2=CvBridge()
     
 def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
@@ -73,145 +74,63 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
 
 
 def pipeline(img, depth_img, distance):
-    '''
-    Pipeline function for detection and tracking
-    '''
-    global frame_count
-    global tracker_list
-    global max_age
-    global min_hits
-    global track_id_list
+
     global debug
     global currentFollow
 
-    #print('distnace : '+str(distance))
-    frame_count+=1
-    if debug:
-        print('Frame:', frame_count)
-    #print('entered pipeline')
-    
-    img_dim = (img.shape[1], img.shape[0])
-    z_box = det.get_localization(img) # measurement
-    if len(z_box) <=0 :
-        currentFollow=-1
-        cv2.imshow('frame',img)
-        return img
+    detects = trackerCore.get_good_trackers(img)
 
-    x_box =[]
+    if len(detects) <=0:
+        currentFollow = -1
+        cv2.imshow('frame', img)
+        return
 
-    if len(tracker_list) > 0:
-        for trk in tracker_list:
-            x_box.append(trk.box)
-    
-    
-    matched, unmatched_dets, unmatched_trks \
-    = tcore.assign_detections_to_trackers(x_box, z_box, iou_thrd = 0.3)
+    pos = float(0)
 
-    # Deal with matched detections     
-    if matched.size >0:
-        for trk_idx, det_idx in matched:
-            z = z_box[det_idx]
-            z = np.expand_dims(z, axis=0).T
-            tmp_trk= tracker_list[trk_idx]
-            tmp_trk.kalman_filter(z)
-            xx = tmp_trk.x_state.T[0].tolist()
-            xx =[xx[0], xx[2], xx[4], xx[6]]
-            x_box[trk_idx] = xx
-            tmp_trk.box =xx
-            tmp_trk.hits += 1
-    
-    # Deal with unmatched detections      
-    if len(unmatched_dets)>0:
-        for idx in unmatched_dets:
-            z = z_box[idx]
-            z = np.expand_dims(z, axis=0).T
-            tmp_trk = tracker.Tracker() # Create a new tracker
-            x = np.array([[z[0], 0, z[1], 0, z[2], 0, z[3], 0]]).T
-            tmp_trk.x_state = x
-            tmp_trk.predict_only()
-            xx = tmp_trk.x_state
-            xx = xx.T[0].tolist()
-            xx =[xx[0], xx[2], xx[4], xx[6]]
-            tmp_trk.box = xx
-            tmp_trk.id = track_id_list.popleft() # assign an ID for the tracker
-            print(tmp_trk.id)
-            tracker_list.append(tmp_trk)
-            x_box.append(xx)
-    
-    # Deal with unmatched tracks       
-    if len(unmatched_trks)>0:
-        for trk_idx in unmatched_trks:
-            tmp_trk = tracker_list[trk_idx]
-            tmp_trk.no_losses += 1
-            tmp_trk.predict_only()
-            xx = tmp_trk.x_state
-            xx = xx.T[0].tolist()
-            xx =[xx[0], xx[2], xx[4], xx[6]]
-            tmp_trk.box =xx
-            x_box[trk_idx] = xx
-                   
-       
-    # The list of tracks to be annotated  
-    good_tracker_list =[]
+    for trk in detects:
+        x_cv2 = trk.box
 
-    pos=float(0)
-    for trk in tracker_list:
-        if ((trk.hits >= min_hits) and (trk.no_losses <=max_age)):
-             good_tracker_list.append(trk)
-             x_cv2 = trk.box
+        img = helpers.draw_box_label(trk.id, img, x_cv2)
 
-             img= helpers.draw_box_label(trk.id,img, x_cv2)
+        if (pos == 0):
+            left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+            if ((right - left) * (bottom - top) <= 0):
+                print('size of square smaller than 0. skip')
+                continue
+            # if(left-right <=0):
+            #    continue
 
-             if(pos==0):
-                left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-                if((right-left)  * (bottom - top) <=0) :
-                    print('size of square smaller than 0. skip')
-                    continue
-                #if(left-right <=0):
-                #    continue
+            center = left + ((right - left) / 2)
+            posProto = center - (W / 2)
+            pos = posProto / (W / 2)
 
-                center = left+ ((right-left)/2)
-                posProto=center-(W/2)
-                pos = posProto/(W/2)
+            print('center: ', center, "half width: ", W / 2, ", posProto: ", posProto, ", pos: ", pos)
+            # pos = center/(W/2)
 
-                print('center: ',center, "half width: ",W/2, ", posProto: ", posProto, ", pos: ", pos)
-                #pos = center/(W/2)
-
-                if driveMode == True:
-                    if(currentFollow==-1):
-                        currentFollow=trk.id
-                        print('set target: id : '+str(trk.id))
-                    else:
-                        if currentFollow!=trk.id:
-                            print('not target. pass id : '+str(trk.id))
-                            pos=0
+            if driveMode == True:
+                if (currentFollow == -1):
+                    currentFollow = trk.id
+                    print('set target: id : ' + str(trk.id))
                 else:
-                    print('not drive Mode. set target none')
-                    currentFollow=-1
-                    pos=0
-                    get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
-             else:
-                 left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-                 if ((right - left) * (bottom - top) <= 0):
-                     print('size of square smaller than 0. skip')
-                     continue
-    # Book keeping
-    deleted_tracks = filter(lambda x: x.no_losses >max_age, tracker_list)
-    
-    for trk in deleted_tracks:
-            track_id_list.append(trk.id)
-    
-    tracker_list = [x for x in tracker_list if x.no_losses<=max_age]
-    
-    if debug:
-       print('Ending tracker_list: ',len(tracker_list))
-       print('Ending good tracker_list: ',len(good_tracker_list))
-    
+                    if currentFollow != trk.id:
+                        print('not target. pass id : ' + str(trk.id))
+                        pos = 0
+            else:
+                print('not drive Mode. set target none')
+                currentFollow = -1
+                pos = 0
+                get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
+        else:
+            left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+            if ((right - left) * (bottom - top) <= 0):
+                print('size of square smaller than 0. skip')
+                continue
+
     cv2.imshow("frame", img)
-    print('target position - '+str(pos))
-    dst=float(distance)
+    print('target position - ' + str(pos))
+    dst = float(distance)
     drive(pos, dst)
-    return img
+    return
 
 def drive(pos, distance):
     global move
