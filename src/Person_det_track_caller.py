@@ -21,6 +21,8 @@ import detector
 import tracker
 import cv2
 
+import person_tracker_core as tcore
+
 
 W = 640
 H = 480
@@ -42,54 +44,6 @@ debug = False
 currentFollow = int
 
 ncv2=CvBridge()
-
-def assign_detections_to_trackers(trackers, detections, iou_thrd = 0.3):
-    '''
-    From current list of trackers and new detections, output matched detections,
-    unmatchted trackers, unmatched detections.
-    '''    
-    
-    IOU_mat= np.zeros((len(trackers),len(detections)),dtype=np.float32)
-    for t,trk in enumerate(trackers):
-        #trk = convert_to_cv2bbox(trk) 
-        for d,det in enumerate(detections):
-         #   det = convert_to_cv2bbox(det)
-            IOU_mat[t,d] = helpers.box_iou2(trk,det) 
-    
-    # Produces matches       
-    # Solve the maximizing the sum of IOU assignment problem using the
-    # Hungarian algorithm (also known as Munkres algorithm)
-    
-    matched_idx = linear_assignment(-IOU_mat)        
-
-    unmatched_trackers, unmatched_detections = [], []
-    for t,trk in enumerate(trackers):
-        if(t not in matched_idx[:,0]):
-            unmatched_trackers.append(t)
-
-    for d, det in enumerate(detections):
-        if(d not in matched_idx[:,1]):
-            unmatched_detections.append(d)
-
-    matches = []
-   
-    # For creating trackers we consider any detection with an 
-    # overlap less than iou_thrd to signifiy the existence of 
-    # an untracked object
-    
-    for m in matched_idx:
-        if(IOU_mat[m[0],m[1]]<iou_thrd):
-            unmatched_trackers.append(m[0])
-            unmatched_detections.append(m[1])
-        else:
-            matches.append(m.reshape(1,2))
-    
-    if (len(matches) == 0):
-        matches = np.empty((0,2),dtype=int)
-    else:
-        matches = np.concatenate(matches,axis=0)
-    
-    return matches, np.array(unmatched_detections), np.array(unmatched_trackers)       
     
 def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     if image is None :
@@ -132,41 +86,27 @@ def pipeline(img, depth_img, distance):
 
     #print('distnace : '+str(distance))
     frame_count+=1
-
+    if debug:
+        print('Frame:', frame_count)
     #print('entered pipeline')
     
     img_dim = (img.shape[1], img.shape[0])
     z_box = det.get_localization(img) # measurement
     if len(z_box) <=0 :
-        #print('z_box empty')
         currentFollow=-1
         cv2.imshow('frame',img)
         return img
-    if debug:
-       print('Frame:', frame_count)
-       
+
     x_box =[]
-    if debug: 
-        for i in range(len(z_box)):
-           img1= helpers.draw_box_label(img, z_box[i], box_color=(255, 0, 0))
-           plt.imshow(img1)
-        plt.show()
-    
+
     if len(tracker_list) > 0:
         for trk in tracker_list:
             x_box.append(trk.box)
     
     
     matched, unmatched_dets, unmatched_trks \
-    = assign_detections_to_trackers(x_box, z_box, iou_thrd = 0.3)  
-    if debug:
-         print('Detection: ', z_box)
-         print('x_box: ', x_box)
-         print('matched:', matched)
-         print('unmatched_det:', unmatched_dets)
-         print('unmatched_trks:', unmatched_trks)
-    
-         
+    = tcore.assign_detections_to_trackers(x_box, z_box, iou_thrd = 0.3)
+
     # Deal with matched detections     
     if matched.size >0:
         for trk_idx, det_idx in matched:
@@ -219,9 +159,7 @@ def pipeline(img, depth_img, distance):
         if ((trk.hits >= min_hits) and (trk.no_losses <=max_age)):
              good_tracker_list.append(trk)
              x_cv2 = trk.box
-             if debug:
-                 print('updated box: ', x_cv2)
-                 print()
+
              img= helpers.draw_box_label(trk.id,img, x_cv2)
 
              if(pos==0):
