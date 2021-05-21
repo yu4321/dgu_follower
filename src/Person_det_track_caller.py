@@ -45,8 +45,20 @@ currentFollow = int
 
 trackerCore=tcore.PersonTrackerCore()
 ncv2=CvBridge()
+
+lastMin = float("inf")
+minCount = 30
+
     
 def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
+    global minCount
+    global lastMin
+    #return 800
+    if(minCount<10):
+        minCount=minCount+1
+        return lastMin
+
+    minCount=0
     if image is None :
         print('image not true. break')
         return
@@ -54,7 +66,15 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
         print('depth image not True, break')
         return
     cuttedD=depth_image[top:bottom, left:right]
+    #print(cuttedD)
     cuttedO=image[top:bottom, left:right]
+
+    min = float("inf")
+
+    for row in cuttedD:
+        for col in row:
+            if(col != 0 and col<min):
+                min=col
 
     if image is None:
         print('image2 not true. break')
@@ -62,7 +82,8 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     if depth_image is None:
         print('depth image2 not True, break')
         return
-    print('cuttedD : ',len(cuttedD), ' cuttedO : ', len(cuttedO))
+    #print('cuttedD : ',len(cuttedD), ' cuttedO : ', len(cuttedO))
+    print('minimum distance : ',min,'mm')
 
     try:
         cv2.imshow("or",cuttedO)
@@ -70,10 +91,12 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     except:
         print('show error')
         #cv2.imshow("or", )
+    lastMin=min
+    return min
 
 
 
-def pipeline(img, depth_img, distance):
+def pipeline(img, depth_img):
 
     global debug
     global currentFollow
@@ -86,6 +109,7 @@ def pipeline(img, depth_img, distance):
         return
 
     pos = float(0)
+    distance = float(0)
 
     for trk in detects:
         x_cv2 = trk.box
@@ -103,6 +127,7 @@ def pipeline(img, depth_img, distance):
             center = left + ((right - left) / 2)
             posProto = center - (W / 2)
             pos = posProto / (W / 2)
+            distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
 
             print('center: ', center, "half width: ", W / 2, ", posProto: ", posProto, ", pos: ", pos)
             # pos = center/(W/2)
@@ -110,6 +135,7 @@ def pipeline(img, depth_img, distance):
             if driveMode == True:
                 if (currentFollow == -1):
                     currentFollow = trk.id
+                    distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
                     print('set target: id : ' + str(trk.id))
                 else:
                     if currentFollow != trk.id:
@@ -119,15 +145,16 @@ def pipeline(img, depth_img, distance):
                 print('not drive Mode. set target none')
                 currentFollow = -1
                 pos = 0
-                get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
+                distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
         else:
             left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+            distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
             if ((right - left) * (bottom - top) <= 0):
                 print('size of square smaller than 0. skip')
                 continue
 
     cv2.imshow("frame", img)
-    print('target position - ' + str(pos))
+    print('target position - ' + str(pos), ' target distance : ',distance, 'mm')
     dst = float(distance)
     drive(pos, dst)
     return
@@ -140,9 +167,10 @@ def drive(pos, distance):
         move.linear.x=0
     move.angular.z=pos * -0.5
 
-    if(distance < 500):
+    if(distance < 700):
         print("so close. stop")
         move.linear.x=0
+        move.angular.z = move.angular.z*0.05
     pub.publish(move)
 
 def image_callback(self, msg):
@@ -200,7 +228,7 @@ if __name__ == "__main__":
             sys.stdout.flush()
             
             np.asarray(img)
-            new_img = pipeline(img, cv_image, cv_image[int(pix[1]), int(pix[0])])
+            new_img = pipeline(img, cv_image)
             #cv2.imshow("frame2", img2)
 
             pressed = cv2.waitKey(1) & 0xFF
