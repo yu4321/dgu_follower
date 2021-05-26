@@ -4,6 +4,8 @@
 """@author: ambakick
 """
 import sys
+import time
+
 import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
@@ -60,16 +62,13 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     #print(cuttedD)
     cuttedO=image[top:bottom, left:right]
 
-    min = float("inf")
-    x=np.array(cuttedD).flatten()
-    mx=np.ma.masked_array(x, mask=x==0)
-    min=mx.min()
-#    print(mx)
-#    print(mx.min())
-#    for row in cuttedD:
-#        for col in row:
-#            if(col != 0 and col<min):
-#                min=col
+    try:
+        min = float("inf")
+        x=np.array(cuttedD).flatten()
+        mx=np.ma.masked_array(x, mask=x==0)
+        min=mx.min()
+    except:
+        min=lastMin
 
     if image is None:
         print('image2 not true. break')
@@ -162,10 +161,10 @@ def drive(pos, distance):
         move.linear.x=0
     move.angular.z=pos * -0.5
 
-    if(distance < 700):
+    if(distance < 1000):
         print("so close. stop")
         move.linear.x=0
-        move.angular.z = move.angular.z*0.05
+        #move.angular.z = move.angular.z*0.05
 
     pub.publish(move)
 
@@ -200,7 +199,17 @@ if __name__ == "__main__":
         #bridge=CvBridge()
         #cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         print('will start loop now')
+
+        frame_rate = 10
+        prev = 0
         while(True):
+            time_elapsed = time.time() - prev
+
+            if time_elapsed > 1. / frame_rate:
+                prev = time.time()
+
+            else:
+                continue
             #msg = lastMsg
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
             data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
