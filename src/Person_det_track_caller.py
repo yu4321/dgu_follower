@@ -30,15 +30,6 @@ H = 480
 # Global variables to be used by funcitons of VideoFileClop
 frame_count = 0 # frame counter
 
-max_age = 15  # no.of consecutive unmatched detection before 
-             # a track is deleted
-
-min_hits =1  # no. of consecutive matches needed to establish a track
-
-tracker_list =[] # list for trackers
-# list for track ID
-track_id_list= deque(['1', '2', '3', '4', '5', '6', '7', '7', '8', '9', '10'])
-
 debug = False
 
 currentFollow = int
@@ -85,12 +76,7 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     #print('cuttedD : ',len(cuttedD), ' cuttedO : ', len(cuttedO))
     print('minimum distance : ',min,'mm')
 
-    try:
-        cv2.imshow("or",cuttedO)
-        cv2.imshow("dp",cuttedD)
-    except:
-        print('show error')
-        #cv2.imshow("or", )
+
     lastMin=min
     return min
 
@@ -114,7 +100,6 @@ def pipeline(img, depth_img):
     for trk in detects:
         x_cv2 = trk.box
 
-        img = helpers.draw_box_label(trk.id, img, x_cv2)
 
         if (pos == 0):
             left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
@@ -153,6 +138,12 @@ def pipeline(img, depth_img):
                 print('size of square smaller than 0. skip')
                 continue
 
+        if trk.id == currentFollow:
+            print("currentfollow ",currentFollow, "trkid ",trk.id)
+            img = helpers.draw_box_label(trk.id, img, x_cv2, box_color=(0,0,255), distance=distance)
+        else:
+            img = helpers.draw_box_label(trk.id, img, x_cv2)
+
     cv2.imshow("frame", img)
     print('target position - ' + str(pos), ' target distance : ',distance, 'mm')
     dst = float(distance)
@@ -171,6 +162,7 @@ def drive(pos, distance):
         print("so close. stop")
         move.linear.x=0
         move.angular.z = move.angular.z*0.05
+
     pub.publish(move)
 
 def image_callback(self, msg):
@@ -212,7 +204,7 @@ if __name__ == "__main__":
             #np_arr=np.fromstring(msg.data,np.uint8)
             #cap = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') 
             #ret, img = cap.read()
-            img=ncv2.imgmsg_to_cv2(msg)
+            img=ncv2.imgmsg_to_cv2(msg, "bgr8")
             cv_image = ncv2.imgmsg_to_cv2(data, data.encoding)
 
             #pix=(msg2.width/2, msg2.height/2)
