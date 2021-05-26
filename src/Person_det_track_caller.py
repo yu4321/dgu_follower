@@ -38,16 +38,16 @@ trackerCore=tcore.PersonTrackerCore()
 ncv2=CvBridge()
 
 lastMin = float("inf")
-minCount = 30
+minCount = 10
 
     
 def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     global minCount
     global lastMin
     #return 800
-    if(minCount<10):
-        minCount=minCount+1
-        return lastMin
+    #if(minCount<10):
+    #    minCount=minCount+1
+    #    return lastMin
 
     minCount=0
     if image is None :
@@ -61,11 +61,15 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
     cuttedO=image[top:bottom, left:right]
 
     min = float("inf")
-
-    for row in cuttedD:
-        for col in row:
-            if(col != 0 and col<min):
-                min=col
+    x=np.array(cuttedD).flatten()
+    mx=np.ma.masked_array(x, mask=x==0)
+    min=mx.min()
+#    print(mx)
+#    print(mx.min())
+#    for row in cuttedD:
+#        for col in row:
+#            if(col != 0 and col<min):
+#                min=col
 
     if image is None:
         print('image2 not true. break')
@@ -230,6 +234,7 @@ if __name__ == "__main__":
             if pressed == ord('s'):
                 driveMode= not driveMode
                 print('drive mode change to '+str(driveMode))
+
 
         cap.release()
         cv2.destroyAllWindows()
