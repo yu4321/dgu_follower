@@ -13,8 +13,11 @@ import helpers
 import detector
 import tracker
 import cv2
+import time
 
 import person_tracker_core as tcore
+
+from person_tracker_core import Direction
 
 trackerCore=tcore.PersonTrackerCore()
 
@@ -25,6 +28,8 @@ H = 480
 frame_count = 0 # frame counter
 
 debug = False
+
+lastDirection = Direction.Center
 
 def pipeline(img):
     global debug
@@ -66,8 +71,16 @@ if __name__ == "__main__":
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
         #out = cv2.VideoWriter('output.avi',fourcc, 8.0, (640,480))
 
-        while(True):
-            
+        frame_rate = 10
+        prev = 0
+        while (True):
+            time_elapsed = time.time() - prev
+
+            if time_elapsed > 1. / frame_rate:
+                prev = time.time()
+
+            else:
+                continue
             ret, img = cap.read()
             #print(img)
             

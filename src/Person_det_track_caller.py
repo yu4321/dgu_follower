@@ -36,22 +36,16 @@ debug = False
 
 currentFollow = int
 
-trackerCore=tcore.PersonTrackerCore()
-ncv2=CvBridge()
+trackerCore = tcore.PersonTrackerCore()
+ncv2 = CvBridge()
 
 lastMin = float("inf")
 minCount = 10
-
     
-def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
+def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom) -> float:
     global minCount
     global lastMin
-    #return 800
-    #if(minCount<10):
-    #    minCount=minCount+1
-    #    return lastMin
 
-    minCount=0
     if image is None :
         print('image not true. break')
         return
@@ -59,11 +53,9 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
         print('depth image not True, break')
         return
     cuttedD=depth_image[top:bottom, left:right]
-    #print(cuttedD)
-    cuttedO=image[top:bottom, left:right]
 
+    min = float("inf")
     try:
-        min = float("inf")
         x=np.array(cuttedD).flatten()
         mx=np.ma.masked_array(x, mask=x==0)
         min=mx.min()
@@ -72,13 +64,11 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom):
 
     if image is None:
         print('image2 not true. break')
-        return
+        return 0
     if depth_image is None:
         print('depth image2 not True, break')
-        return
-    #print('cuttedD : ',len(cuttedD), ' cuttedO : ', len(cuttedO))
+        return 0
     print('minimum distance : ',min,'mm')
-
 
     lastMin=min
     return min
@@ -102,7 +92,6 @@ def pipeline(img, depth_img):
 
     for trk in detects:
         x_cv2 = trk.box
-
 
         if (pos == 0):
             left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]

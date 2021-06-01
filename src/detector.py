@@ -16,6 +16,11 @@ tf.disable_v2_behavior()
 #os.chdir(cwd+'/models')
 import visualization_utils
 
+class DetectedBox(object):
+    def __init__(self, box, score):
+        self.box=box
+        self.score=score
+
 class PersonDetector(object):
     def __init__(self):
         self.car_boxes = []
@@ -40,6 +45,7 @@ class PersonDetector(object):
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
             with tf.gfile.GFile(PATH_TO_CKPT, 'rb') as fid:
+
                serialized_graph = fid.read()
                od_graph_def.ParseFromString(serialized_graph)
                tf.import_graph_def(od_graph_def, name='')
@@ -88,7 +94,7 @@ class PersonDetector(object):
                         10: {'id': 10, 'name': u'traffic light'},
                         11: {'id': 11, 'name': u'fire hydrant'},
                         13: {'id': 13, 'name': u'stop sign'},
-                        14: {'id': 14, 'name': u'parking meter'}}  
+                        14: {'id': 14, 'name': u'parking meter'}}
         
         with self.detection_graph.as_default():
               image_expanded = np.expand_dims(image, axis=0)
@@ -133,7 +139,8 @@ class PersonDetector(object):
                       ratio = box_h/(box_w + 0.01)
                       
                       #if ((ratio < 0.8) and (box_h>20) and (box_w>20)):
-                      tmp_car_boxes.append(box)
+                      curBox=DetectedBox(box, scores[idx])
+                      tmp_car_boxes.append(curBox)
                       print(box, ', confidence: ', scores[idx], 'ratio:', ratio)
                       '''   
                       else:

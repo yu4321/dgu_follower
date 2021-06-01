@@ -12,6 +12,12 @@ import detector
 import tracker
 import cv2
 
+from enum import Enum
+
+class Direction(Enum):
+    Left = 1
+    Center = 0
+    Right = 2
 
 class PersonTrackerCore:
 
@@ -46,7 +52,8 @@ class PersonTrackerCore:
     def get_good_trackers(self, img):
         good_tracker_list = []
         img_dim = (img.shape[1], img.shape[0])
-        z_box = self.det.get_localization(img)  # measurement
+        scoreBoxes = self.det.get_localization(img)  # measurement
+        z_box = list(map(lambda x: x.box, scoreBoxes))
         if len(z_box) <= 0:
             good_tracker_list.clear()
             return good_tracker_list
@@ -68,6 +75,7 @@ class PersonTrackerCore:
                 xx = [xx[0], xx[2], xx[4], xx[6]]
                 x_box[trk_idx] = xx
                 tmp_trk.box = xx
+                tmp_trk.score = scoreBoxes[det_idx].score
                 tmp_trk.hits += 1
 
         # Deal with unmatched detections
@@ -84,6 +92,7 @@ class PersonTrackerCore:
                 xx = [xx[0], xx[2], xx[4], xx[6]]
                 tmp_trk.box = xx
                 tmp_trk.id = self.getTrackId() # assign an ID for the tracker
+                tmp_trk.score=scoreBoxes[idx].score
                 print(tmp_trk.id)
                 self.tracker_list.append(tmp_trk)
                 x_box.append(xx)
