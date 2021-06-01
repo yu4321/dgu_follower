@@ -58,7 +58,11 @@ class Tracker(): # class for Kalman Filter based tracker
         self.R_diag_array = self.R_ratio * np.array([self.L, self.L, self.L, self.L])
         self.R = np.diag(self.R_diag_array)
         
-        
+    def isBoxValid(self):
+        x_cv2=self.box
+        left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        return ((right - left) * (bottom - top)) > 0
+
     def update_R(self):   
         R_diag_array = self.R_ratio * np.array([self.L, self.L, self.L, self.L])
         self.R = np.diag(R_diag_array)

@@ -19,12 +19,17 @@ class Direction(Enum):
     Center = 0
     Right = 2
 
+class Mode(Enum):
+    Chasing = 1
+    NearSearching = 2
+    FarSearching = 3
+
 class PersonTrackerCore:
 
 
     def __init__(self):
-        self.W = 640
-        self.H = 480
+        self.W : int = 640
+        self.H : int = 480
 
         # Global variables to be used by funcitons of VideoFileClop
         self.frame_count = 0  # frame counter
@@ -48,6 +53,19 @@ class PersonTrackerCore:
         print('published id ',ret)
         self.track_id+=1
         return ret
+
+    def GetDirectionOfTracker(self, trk:tracker.Tracker):
+        x_cv2 = trk.box
+        left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        center = left + ((right - left) / 2)
+
+        w3=self.W/3
+        if center < w3 :
+            return Direction.Left
+        elif center < w3*2 :
+            return Direction.Center
+        else:
+            return Direction.Right
 
     def get_good_trackers(self, img):
         good_tracker_list = []
@@ -124,6 +142,55 @@ class PersonTrackerCore:
 
 
 
+def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom) -> float:
+    if image is None :
+        print('image not true. break')
+        return
+    if depth_image is None:
+        print('depth image not True, break')
+        return
+    cuttedD=depth_image[top:bottom, left:right]
+
+    min = float("inf")
+    try:
+        x=np.array(cuttedD).flatten()
+        mx=np.ma.masked_array(x, mask=x==0)
+        min=mx.min()
+    except:
+        return 0
+
+    if image is None:
+        print('image2 not true. break')
+        return 0
+    if depth_image is None:
+        print('depth image2 not True, break')
+        return 0
+    print('minimum distance : ',min,'mm')
+
+    return min
+
+def get_biggest_distance_of_box(depth_image, tracker:tracker.Tracker) -> float:
+    x_cv2 = tracker.box
+    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+    if depth_image is None:
+        print('depth image not True, break')
+        return
+    cuttedD = depth_image[top:bottom, left:right]
+
+    min = float("inf")
+    try:
+        x = np.array(cuttedD).flatten()
+        mx = np.ma.masked_array(x, mask=x == 0)
+        min = mx.min()
+    except:
+        return 0
+
+    if depth_image is None:
+        print('depth image2 not True, break')
+        return 0
+    print('minimum distance : ', min, 'mm')
+
+    return min
 
 
 def assign_detections_to_trackers(trackers, detections, iou_thrd=0.3):

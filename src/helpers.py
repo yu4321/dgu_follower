@@ -112,7 +112,7 @@ def convert_to_cv2bbox(bbox, img_dim=(1280, 720)):
     return (left, top, right, bottom)
 
 
-def draw_box_label(tracker: tracker.Tracker, img, box_color, show_label=True):
+def draw_box_label_Trac(tracker: tracker.Tracker, img, box_color, show_label=True, distance=-1):
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_size = 0.7
     font_color = (0, 0, 0)
@@ -129,7 +129,7 @@ def draw_box_label(tracker: tracker.Tracker, img, box_color, show_label=True):
         cv2.rectangle(img, (left - 2, top - 45), (right + 2, top), box_color, -1, 1)
 
         # Output the labels that show the x and y coordinates of the bounding box center.
-        text_x = 'id=' + str(id)
+        text_x = 'id=' + str(tracker.id)
         cv2.putText(img, text_x, (left, top - 25), font, font_size, font_color, 1, cv2.LINE_AA)
         text_y = 'y=' + str((top + bottom) / 2)
         cv2.putText(img, text_y, (left, top - 5), font, font_size, font_color, 1, cv2.LINE_AA)
@@ -139,7 +139,6 @@ def draw_box_label(tracker: tracker.Tracker, img, box_color, show_label=True):
                         font_size, box_color, 2, cv2.LINE_AA)
 
     return img
-    return
 
 
 def draw_box_label(id, img, bbox_cv2, box_color=(0, 255, 255), show_label=True, distance=-1):

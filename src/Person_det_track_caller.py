@@ -25,6 +25,9 @@ import cv2
 
 import person_tracker_core as tcore
 
+import target
+
+from person_tracker_core import Direction, Mode
 
 W = 640
 H = 480
@@ -36,111 +39,127 @@ debug = False
 
 currentFollow = int
 
+currentTarget:target.Target = None
+
 trackerCore = tcore.PersonTrackerCore()
 ncv2 = CvBridge()
 
 lastMin = float("inf")
 minCount = 10
-    
-def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom) -> float:
-    global minCount
-    global lastMin
 
-    if image is None :
-        print('image not true. break')
-        return
-    if depth_image is None:
-        print('depth image not True, break')
-        return
-    cuttedD=depth_image[top:bottom, left:right]
+lastTurn : Direction = Direction.Center
 
-    min = float("inf")
-    try:
-        x=np.array(cuttedD).flatten()
-        mx=np.ma.masked_array(x, mask=x==0)
-        min=mx.min()
-    except:
-        min=lastMin
+currentMode : Mode = Mode.Chasing
 
-    if image is None:
-        print('image2 not true. break')
-        return 0
-    if depth_image is None:
-        print('depth image2 not True, break')
-        return 0
-    print('minimum distance : ',min,'mm')
-
-    lastMin=min
-    return min
-
-
+waitStartedTime : time = None
 
 def pipeline(img, depth_img):
-
-    global debug
     global currentFollow
+    global currentTarget
+    global currentMode
+    global lastTurn
+    global waitStartedTime
 
     detects = trackerCore.get_good_trackers(img)
 
-    if len(detects) <=0:
-        currentFollow = -1
-        cv2.imshow('frame', img)
-        return
+    if currentMode == Mode.Chasing:
+        isIdLost = True
 
-    pos = float(0)
-    distance = float(0)
-
-    for trk in detects:
-        x_cv2 = trk.box
-
-        if (pos == 0):
-            left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-            if ((right - left) * (bottom - top) <= 0):
-                print('size of square smaller than 0. skip')
+        trk: tracker.Tracker
+        for trk in detects:
+            x_cv2 = trk.box
+            # 사용 불가 박스는 넘김
+            if (trk.isBoxValid() == False):
                 continue
-            # if(left-right <=0):
-            #    continue
 
-            center = left + ((right - left) / 2)
-            posProto = center - (W / 2)
-            pos = posProto / (W / 2)
-            distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
-
-            print('center: ', center, "half width: ", W / 2, ", posProto: ", posProto, ", pos: ", pos)
-            # pos = center/(W/2)
-
-            if driveMode == True:
-                if (currentFollow == -1):
+            # 현재 타겟이 없을 경우 : 타겟 획득 행동
+            if (currentTarget == None):
+                if (trk.score > 0.8):
+                    RegisterTarget(trk, img)
                     currentFollow = trk.id
-                    distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
-                    print('set target: id : ' + str(trk.id))
-                else:
-                    if currentFollow != trk.id:
-                        print('not target. pass id : ' + str(trk.id))
-                        pos = 0
-            else:
-                print('not drive Mode. set target none')
-                currentFollow = -1
-                pos = 0
-                distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
-        else:
-            left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-            distance = get_biggest_distance_of_box(img, depth_img, left, right, top, bottom)
-            if ((right - left) * (bottom - top) <= 0):
-                print('size of square smaller than 0. skip')
-                continue
 
-        if trk.id == currentFollow:
-            print("currentfollow ",currentFollow, "trkid ",trk.id)
-            img = helpers.draw_box_label(trk.id, img, x_cv2, box_color=(0,0,255), distance=distance)
+            # 현재 트래커의 id가 현재 추적 id와 같을 경우
+            if (trk.id == currentFollow):
+                isIdLost = False
+                RefreshTargetData(trk, img, depth_img)
+                lastTurn = currentTarget.lastDirection
+                img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
+
+            else:
+                img = helpers.draw_box_label(trk.id, img, x_cv2)
+
+        # id 소실시 follow는 제거됨. 추적 모드로 들어가야 하니까
+        if (isIdLost):
+            currentFollow = -1
+            #currentMode = Mode.NearSearching
+            if (currentTarget != None):
+                ChangeModeToFarSearching()
+                waitStartedTime = time.time()
         else:
-            img = helpers.draw_box_label(trk.id, img, x_cv2)
+            driveToTarget()
+
+    elif currentMode == Mode.FarSearching:
+        trk: tracker.Tracker
+        for trk in detects:
+            # 사용 불가 박스는 넘김
+            if (trk.isBoxValid() == False):
+                continue
+            if (trk.score > 0.8):
+                RegisterTarget(trk, img)
+                currentFollow = trk.id
+                ChangeModeToChasing()
+                break
+        if currentMode == Mode.FarSearching:
+            if time.time() - waitStartedTime > 30:
+                DisposeTarget()
+                ChangeModeToChasing()
+
 
     cv2.imshow("frame", img)
-    print('target position - ' + str(pos), ' target distance : ',distance, 'mm')
-    dst = float(distance)
-    drive(pos, dst)
+
+def ChangeModeToChasing():
+    global currentMode
+    print('current mode changed to chasing')
+    currentMode = Mode.Chasing
+
+def ChangeModeToFarSearching():
+    global currentMode
+    print('current mode changed to farsearching')
+    currentMode = Mode.FarSearching
+
+def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
+    global currentTarget
+    global lastMin
+    x_cv2 = trk.box
+    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+    currentTarget.lastImg= img[top:bottom, left:right]
+    currentTarget.latestTracker = trk
+
+    tDistance = tcore.get_biggest_distance_of_box(depth_img,trk)
+    if(tDistance ==0):
+        currentTarget.latestDistance = lastMin
+    else:
+        currentTarget.latestDistance = tDistance
+        lastMin=tDistance
+
+    currentTarget.lastDirection = trackerCore.GetDirectionOfTracker(trk)
     return
+
+
+def IdentifyTarget(trk : tracker.Tracker, img):
+    if(trk.score > 0.8):
+        return True
+
+def RegisterTarget(trk: tracker.Tracker, img):
+    global currentTarget
+
+    currentTarget = target.Target()
+    currentTarget.firstTracker = trk
+    currentTarget.latestTracker = trk
+
+    x_cv2 = trk.box
+    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+    currentTarget.firstImg = img[top:bottom, left:right]
 
 def drive(pos, distance):
     global move
@@ -157,8 +176,40 @@ def drive(pos, distance):
 
     pub.publish(move)
 
-def image_callback(self, msg):
-	lastMsg=msg
+def driveToTarget():
+    global move
+    global currentTarget
+    global driveMode
+
+    if(currentTarget != None):
+        if(currentTarget.latestDistance < 1000):
+            print("so close. stop")
+            move.linear.x = 0
+        else:
+            move.linear.x = 0.5
+
+        if(lastTurn == Direction.Right):
+            move.angular.z = -0.5
+        elif lastTurn == Direction.Left:
+            move.angular.z = 0.5
+
+        if(driveMode == False):
+            print('not drive mode')
+            move.linear.x = 0
+
+        pub.publish(move)
+
+def DisposeTarget():
+    global  currentTarget
+    print('remove current target')
+    currentTarget=None
+
+def PrintCenterDistance(x, y, depth_img):
+    pix = (x/ 2, y / 2)
+    sys.stdout.write(
+        'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], depth_img[int(pix[1]), int(pix[0])]))
+    sys.stdout.flush()
+
 if __name__ == "__main__":    
     currentFollow=-1
     driveMode=False
@@ -181,12 +232,7 @@ if __name__ == "__main__":
         print('node inited')
         pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
         print('published')
-        #image_sub = rospy.Subscriber('/camera/color/image_raw',Image, image_callback)
-        print('subscribed')
-        #rospy.spin()
-        #print('ros spin start')
-        #bridge=CvBridge()
-        #cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
         print('will start loop now')
 
         frame_rate = 10
@@ -199,41 +245,30 @@ if __name__ == "__main__":
 
             else:
                 continue
-            #msg = lastMsg
+
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
             data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
-            #print('get img encoding : '+str(msg.encoding))
-            #np_arr=np.fromstring(msg.data,np.uint8)
-            #cap = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') 
-            #ret, img = cap.read()
+
             img=ncv2.imgmsg_to_cv2(msg, "bgr8")
             cv_image = ncv2.imgmsg_to_cv2(data, data.encoding)
 
-            #pix=(msg2.width/2, msg2.height/2)
-            #print('Depth at center- ' + str(img2[pix[1], pix[0]]))
-            #ret, img=cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            #print(img)
 
-            pix = (data.width / 2, data.height / 2)
             W=int(data.width)
             H=int(data.height)
-            sys.stdout.write(
-                'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], cv_image[int(pix[1]), int(pix[0])]))
-            sys.stdout.flush()
-            
-            np.asarray(img)
+            tcore.W = W
+            tcore.H = H
+
+            PrintCenterDistance(W,H,cv_image)
+
             new_img = pipeline(img, cv_image)
-            #cv2.imshow("frame2", img2)
 
             pressed = cv2.waitKey(1) & 0xFF
+
             if pressed== ord('q'):
                 print('exit with q')
                 break
             if pressed == ord('s'):
                 driveMode= not driveMode
                 print('drive mode change to '+str(driveMode))
-
-
-        cap.release()
-        cv2.destroyAllWindows()
-        print(round(end-start, 2), 'Seconds to finish')
+                if(driveMode == False):
+                    DisposeTarget();
