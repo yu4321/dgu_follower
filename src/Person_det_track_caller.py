@@ -13,6 +13,7 @@ import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
+from darknet_ros_msgs.msg import BoundingBoxes
 import numpy as np
 import matplotlib.pyplot as plt
 import glob
@@ -59,7 +60,7 @@ waitStartedTime: time = None
 
 isWorking=False
 
-def pipeline(img, depth_img):
+def pipeline(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global currentTarget
     global currentMode
@@ -74,7 +75,7 @@ def pipeline(img, depth_img):
     try:
         isWorking = True
 
-        detects = trackerCore.get_good_trackers(img)
+        detects = trackerCore.get_darknet_trackers(img,darknets)
 
         if currentMode == Mode.Chasing:
             isIdLost = True
@@ -292,6 +293,9 @@ if __name__ == "__main__":
 
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
             data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
+            darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes)
+
+            #print(darknets)
 
             start=time.time()
             img=ncv2.imgmsg_to_cv2(msg, "bgr8")
@@ -306,7 +310,7 @@ if __name__ == "__main__":
             #PrintCenterDistance(W,H,cv_image)
 
             start = time.time()
-            new_img = pipeline(img, cv_image)
+            new_img = pipeline(img, cv_image, darknets.bounding_boxes)
             endpipeline=time.time()-start
 
             start = time.time()

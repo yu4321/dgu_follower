@@ -6,6 +6,7 @@ import glob
 
 from collections import deque
 from sklearn.utils.linear_assignment_ import linear_assignment
+from darknet_ros_msgs.msg import BoundingBoxes
 
 import helpers
 import detector
@@ -66,6 +67,20 @@ class PersonTrackerCore:
             return Direction.Center
         else:
             return Direction.Right
+
+    def get_darknet_trackers(self, img, darknets : BoundingBoxes):
+        good_tracker_list = []
+        #print('get boxes ',len(darknets))
+        for box in darknets:
+            if(box.Class != "person"):
+                continue
+            n=tracker.Tracker()
+            n.score=box.probability
+            n.box = (box.ymin, box.xmin, box.ymax, box.xmax)
+            #left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+            good_tracker_list.append(n)
+
+        return good_tracker_list
 
     def get_good_trackers(self, img):
         good_tracker_list = []
