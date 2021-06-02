@@ -59,10 +59,10 @@ class PersonTrackerCore:
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         center = left + ((right - left) / 2)
 
-        w3=self.W/3
-        if center < w3 :
+        #w3=self.W/3
+        if center < 150 :
             return Direction.Left
-        elif center < w3*2 :
+        elif center < 330 :
             return Direction.Center
         else:
             return Direction.Right

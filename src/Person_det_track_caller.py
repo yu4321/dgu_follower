@@ -47,75 +47,95 @@ ncv2 = CvBridge()
 lastMin = float("inf")
 minCount = 10
 
+currentTurn : Direction = Direction.Center
 lastTurn : Direction = Direction.Center
 
-currentMode : Mode = Mode.Chasing
+currentMode: Mode = Mode.Chasing
 
-waitStartedTime : time = None
+waitStartedTime: time = None
+
+isWorking=False
 
 def pipeline(img, depth_img):
     global currentFollow
     global currentTarget
     global currentMode
+    global currentTurn
     global lastTurn
     global waitStartedTime
+    global isWorking
 
-    detects = trackerCore.get_good_trackers(img)
+    if(isWorking == True):
+        print('atomic blocked')
+        return img
+    try:
+        isWorking = True
 
-    if currentMode == Mode.Chasing:
-        isIdLost = True
+        detects = trackerCore.get_good_trackers(img)
 
-        trk: tracker.Tracker
-        for trk in detects:
-            x_cv2 = trk.box
-            # 사용 불가 박스는 넘김
-            if (trk.isBoxValid() == False):
-                continue
+        if currentMode == Mode.Chasing:
+            isIdLost = True
 
-            # 현재 타겟이 없을 경우 : 타겟 획득 행동
-            if (currentTarget == None):
+            trk: tracker.Tracker
+            for trk in detects:
+                x_cv2 = trk.box
+                # 사용 불가 박스는 넘김
+                if (trk.isBoxValid() == False):
+                    continue
+
+                # 현재 타겟이 없을 경우 : 타겟 획득 행동
+                if (currentTarget == None):
+                    if (trk.score > 0.8):
+                        RegisterTarget(trk, img)
+                        currentFollow = trk.id
+
+                # 현재 트래커의 id가 현재 추적 id와 같을 경우
+                if (trk.id == currentFollow):
+                    isIdLost = False
+                    RefreshTargetData(trk, img, depth_img)
+                    currentTurn = currentTarget.lastDirection
+                    img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
+
+                else:
+                    img = helpers.draw_box_label(trk.id, img, x_cv2)
+
+            # id 소실시 follow는 제거됨. 추적 모드로 들어가야 하니까
+            if (isIdLost):
+                currentFollow = -1
+                # currentMode = Mode.NearSearching
+                if (currentTarget != None):
+                    ChangeModeToFarSearching()
+                    waitStartedTime = time.time()
+            else:
+                driveToTarget()
+            #return img
+
+        elif currentMode == Mode.FarSearching:
+            if(lastTurn != Direction.Center):
+                print('start stand turn to ',currentTarget.lastDirection)
+                standTurn(currentTarget.lastDirection)
+                lastTurn=Direction.Center
+
+            trk: tracker.Tracker
+            for trk in detects:
+                # 사용 불가 박스는 넘김
+                if (trk.isBoxValid() == False):
+                    continue
                 if (trk.score > 0.8):
                     RegisterTarget(trk, img)
                     currentFollow = trk.id
+                    ChangeModeToChasing()
+                    break
+            if currentMode == Mode.FarSearching:
+                if time.time() - waitStartedTime > 30:
+                    DisposeTarget()
+                    ChangeModeToChasing()
 
-            # 현재 트래커의 id가 현재 추적 id와 같을 경우
-            if (trk.id == currentFollow):
-                isIdLost = False
-                RefreshTargetData(trk, img, depth_img)
-                lastTurn = currentTarget.lastDirection
-                img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
+        # cv2.imshow("frame", img)
+    finally:
+        isWorking = False
+        return img
 
-            else:
-                img = helpers.draw_box_label(trk.id, img, x_cv2)
-
-        # id 소실시 follow는 제거됨. 추적 모드로 들어가야 하니까
-        if (isIdLost):
-            currentFollow = -1
-            #currentMode = Mode.NearSearching
-            if (currentTarget != None):
-                ChangeModeToFarSearching()
-                waitStartedTime = time.time()
-        else:
-            driveToTarget()
-
-    elif currentMode == Mode.FarSearching:
-        trk: tracker.Tracker
-        for trk in detects:
-            # 사용 불가 박스는 넘김
-            if (trk.isBoxValid() == False):
-                continue
-            if (trk.score > 0.8):
-                RegisterTarget(trk, img)
-                currentFollow = trk.id
-                ChangeModeToChasing()
-                break
-        if currentMode == Mode.FarSearching:
-            if time.time() - waitStartedTime > 30:
-                DisposeTarget()
-                ChangeModeToChasing()
-
-
-    cv2.imshow("frame", img)
 
 def ChangeModeToChasing():
     global currentMode
@@ -176,22 +196,41 @@ def drive(pos, distance):
 
     pub.publish(move)
 
+def standTurn(direction : Direction):
+
+    if (direction == Direction.Right):
+        move.angular.z = -0.3
+    elif direction == Direction.Left:
+        move.angular.z = 0.3
+    pub.publish(move)
+    time.sleep(0.1)
+
 def driveToTarget():
+
     global move
     global currentTarget
     global driveMode
+    global lastTurn
+    global currentTurn
 
     if(currentTarget != None):
-        if(currentTarget.latestDistance < 1000):
+        if(currentTarget.latestDistance < 500):
             print("so close. stop")
             move.linear.x = 0
         else:
-            move.linear.x = 0.5
+            move.linear.x = 0.4
 
-        if(lastTurn == Direction.Right):
-            move.angular.z = -0.5
-        elif lastTurn == Direction.Left:
-            move.angular.z = 0.5
+        if(currentTurn == Direction.Right):
+            move.angular.z = -0.25
+        elif currentTurn == Direction.Left:
+            move.angular.z = 0.25
+        else:
+            if(lastTurn == Direction.Right):
+                move.angular.z = 0.1
+            elif lastTurn == Direction.Left:
+                move.angular.z = -0.1
+
+        lastTurn = currentTurn
 
         if(driveMode == False):
             print('not drive mode')
@@ -249,18 +288,33 @@ if __name__ == "__main__":
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
             data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
 
+            start=time.time()
             img=ncv2.imgmsg_to_cv2(msg, "bgr8")
             cv_image = ncv2.imgmsg_to_cv2(data, data.encoding)
-
+            endcv2 = time.time() - start
 
             W=int(data.width)
             H=int(data.height)
             tcore.W = W
             tcore.H = H
 
-            PrintCenterDistance(W,H,cv_image)
+            #PrintCenterDistance(W,H,cv_image)
 
+            start = time.time()
             new_img = pipeline(img, cv_image)
+            endpipeline=time.time()-start
+
+            start = time.time()
+            try:
+                cv2.imshow('frame', new_img)
+            except:
+                continue
+
+            endimshow=time.time()-start
+
+            sys.stdout.write(
+                'Time: cv2 %f, pipeline %f, imshow %f\r' % (endcv2,endpipeline,endimshow))
+            sys.stdout.flush()
 
             pressed = cv2.waitKey(1) & 0xFF
 

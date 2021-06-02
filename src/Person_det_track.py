@@ -42,7 +42,8 @@ trackerCore = tcore.PersonTrackerCore()
 lastMin = float("inf")
 minCount = 10
 
-lastTurn: Direction = Direction.Center
+currentTurn: Direction = Direction.Center
+lastTurn:Direction = Direction.Center
 
 currentMode: Mode = Mode.Chasing
 
@@ -53,7 +54,7 @@ def pipeline(img):
     global currentFollow
     global currentTarget
     global currentMode
-    global lastTurn
+    global currentTurn
     global waitStartedTime
 
     detects = trackerCore.get_good_trackers(img)
