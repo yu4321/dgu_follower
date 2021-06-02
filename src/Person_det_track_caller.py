@@ -6,6 +6,9 @@
 import sys
 import time
 
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"
+
 import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
@@ -199,9 +202,9 @@ def drive(pos, distance):
 def standTurn(direction : Direction):
 
     if (direction == Direction.Right):
-        move.angular.z = -0.3
+        move.angular.z = -0.2
     elif direction == Direction.Left:
-        move.angular.z = 0.3
+        move.angular.z = 0.2
     pub.publish(move)
     time.sleep(0.1)
 
@@ -221,14 +224,15 @@ def driveToTarget():
             move.linear.x = 0.4
 
         if(currentTurn == Direction.Right):
-            move.angular.z = -0.25
+            move.angular.z = -0.2
         elif currentTurn == Direction.Left:
-            move.angular.z = 0.25
-        else:
-            if(lastTurn == Direction.Right):
-                move.angular.z = 0.1
-            elif lastTurn == Direction.Left:
-                move.angular.z = -0.1
+            move.angular.z = 0.2
+
+        # else:
+        #     if(lastTurn == Direction.Right):
+        #         move.angular.z = 0.05
+        #     elif lastTurn == Direction.Left:
+        #         move.angular.z = -0.05
 
         lastTurn = currentTurn
 
@@ -249,7 +253,8 @@ def PrintCenterDistance(x, y, depth_img):
         'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], depth_img[int(pix[1]), int(pix[0])]))
     sys.stdout.flush()
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    print('current path : ',os.getcwd())
     currentFollow=-1
     driveMode=False
     det = detector.PersonDetector()
