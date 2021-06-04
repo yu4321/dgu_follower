@@ -111,7 +111,7 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
 
             # id 소실시 follow는 제거됨. 추적 모드로 들어가야 하니까
             if (isIdLost):
-                currentFollow = -1
+                # currentFollow = -1
                 # currentMode = Mode.NearSearching
                 if (currentTarget != None):
                     ChangeModeToFarSearching()
@@ -214,7 +214,6 @@ def rawDrive(trk:tracker.Tracker, distance):
     posProto =center - half
     pos = posProto / half
 
-    #pos = (trackerCore.GetCenterOfTracker(trk) - (trackerCore.W /2)) / (trackerCore.W/2)
     print('pos ',pos)
     if pos != 0:
         move.linear.x = 0.5
