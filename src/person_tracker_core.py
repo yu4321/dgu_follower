@@ -8,10 +8,18 @@ from collections import deque
 from sklearn.utils.linear_assignment_ import linear_assignment
 from darknet_ros_msgs.msg import BoundingBoxes
 
+from deep_sort.detection import Detection
+from deep_sort import nn_matching
+from deep_sort.tracker import Tracker
+from deep_sort import generate_detections as gdet
+from deep_sort import preprocessing as prep
+
 import helpers
 import detector
 import tracker
 import cv2
+
+import os
 
 from enum import Enum
 
@@ -29,8 +37,20 @@ class PersonTrackerCore:
 
 
     def __init__(self):
-        self.W : int = 640
-        self.H : int = 480
+        self.W : int = 480
+        self.H : int = 640
+        cwd = os.path.dirname(os.path.realpath(__file__))
+        os.chdir(cwd)
+        self.detections=[]
+        self.scores=[]
+
+        max_cosine_distance = 0.2
+        nn_budget = 100
+
+        metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
+        self.tracker = Tracker(metric)
+        model_filename = "mars-small128/mars-small128.pb"  # Change it to your directory
+        self.encoder = gdet.create_box_encoder(model_filename)
 
         # Global variables to be used by funcitons of VideoFileClop
         self.frame_count = 0  # frame counter
@@ -55,30 +75,101 @@ class PersonTrackerCore:
         self.track_id+=1
         return ret
 
+    def GetCenterOfTracker(self, trk:tracker.Tracker):
+        x_cv2 = trk.box
+        left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        center = left + ((right - left) / 2)
+        print('box :',left,top,right,bottom)
+        print('center : ',center)
+        return center
+
     def GetDirectionOfTracker(self, trk:tracker.Tracker):
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         center = left + ((right - left) / 2)
 
+        print('x center : ',center)
         #w3=self.W/3
-        if center < 150 :
+        if center < 130 :
             return Direction.Left
-        elif center < 330 :
+        elif center < 350 :
             return Direction.Center
         else:
             return Direction.Right
 
+    def callback_det(self, data):
+        self.detections = []
+        self.scores = []
+        for box in data:
+            self.detections.append(np.array([box.xmin, box.ymin, box.xmax - box.xmin, box.ymax - box.ymin]))
+            self.scores.append(float('%.2f' % box.probability))
+        self.detections = np.array(self.detections)
+
+    def callback_image(self, cv_rgb, darknets : BoundingBoxes):
+        # Features and detections
+        features = self.encoder(cv_rgb, self.detections)
+        detections_new = [Detection(bbox, score, feature, orgBox) for bbox, score, feature, orgBox in
+                          zip(self.detections, self.scores, features, darknets)]
+        # Run non-maxima suppression.
+        boxes = np.array([d.tlwh for d in detections_new])
+        scores_new = np.array([d.confidence for d in detections_new])
+        indices = prep.non_max_suppression(boxes, 1.0, scores_new)
+        detections_new = [detections_new[i] for i in indices]
+        # Call the tracker
+        self.tracker.predict()
+        self.tracker.update(detections_new)
+        # Detecting bounding boxes
+        # for det in detections_new:
+        #     bbox = det.to_tlbr()
+        #     cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (100, 255, 50), 1)
+        #     cv2.putText(cv_rgb, "person", (int(bbox[0]), int(bbox[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 255, 50),
+        #                 lineType=cv2.LINE_AA)
+        # Tracker bounding boxes
+        # idx=-1
+        # for track in self.tracker.tracks:
+        #     idx+=1
+        #     if not track.is_confirmed() or track.time_since_update > 1:
+        #         continue
+        #     #print(darknets[idx], ', get id ',track.track_id)
+        #     #darknets[idx].id = track.track_id
+        #     bbox = track.to_tlbr()
+        #     # cv2.rectangle(cv_rgb, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 255), 1)
+        #     # cv2.putText(cv_rgb, str(track.track_id), (int(bbox[2]), int(bbox[1])), 0, 5e-3 * 200, (255, 255, 255), 1)
+        return
+
     def get_darknet_trackers(self, img, darknets : BoundingBoxes):
         good_tracker_list = []
+
         #print('get boxes ',len(darknets))
-        for box in darknets:
-            if(box.Class != "person"):
+        self.callback_det(darknets)
+        #print('callback det complete\n')
+        self.callback_image(img, darknets)
+        #print('callbakc img complete\n')
+        for track in self.tracker.tracks:
+            if not track.is_confirmed() or track.time_since_update > 1:
                 continue
-            n=tracker.Tracker()
-            n.score=box.probability
+            n = tracker.Tracker()
+            box = track.orgBox
+            #n.score = box.probability
             n.box = (box.ymin, box.xmin, box.ymax, box.xmax)
-            #left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+            #n.id = box.id
+            #n.box = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
+            #n.box = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
+
+            n.id = track.track_id
+            #print(n.box, ' id: ', n.id)
+            n.score = track.confidence
+            # left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
             good_tracker_list.append(n)
+
+        #print(good_tracker_list)
+        # for box in darknets:
+        #     n=tracker.Tracker()
+        #     n.score=box.probability
+        #     n.box = (box.ymin, box.xmin, box.ymax, box.xmax)
+        #     n.id = box.id
+        #     #left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        #     good_tracker_list.append(n)
 
         return good_tracker_list
 
@@ -180,7 +271,7 @@ def get_biggest_distance_of_box(image, depth_image, left, right, top, bottom) ->
     if depth_image is None:
         print('depth image2 not True, break')
         return 0
-    print('minimum distance : ',min,'mm')
+    #print('minimum distance : ',min,'mm')
 
     return min
 

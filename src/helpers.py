@@ -113,6 +113,7 @@ def convert_to_cv2bbox(bbox, img_dim=(1280, 720)):
 
 
 def draw_box_label_Trac(tracker: tracker.Tracker, img, box_color, show_label=True, distance=-1):
+    print('start drawing track')
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_size = 0.7
     font_color = (0, 0, 0)
@@ -134,9 +135,9 @@ def draw_box_label_Trac(tracker: tracker.Tracker, img, box_color, show_label=Tru
         text_y = 'y=' + str((top + bottom) / 2)
         cv2.putText(img, text_y, (left, top - 5), font, font_size, font_color, 1, cv2.LINE_AA)
         if (distance != -1):
-            text_c = 'distance = ' + str(distance) + 'mm'
+            text_c = text_x + ' distance = ' + str(distance) + 'mm'
             cv2.putText(img, text_c, (int(left + ((right - left) / 2)), int(top + ((bottom - top) / 2))), font,
-                        font_size, box_color, 2, cv2.LINE_AA)
+                        0.3, box_color, 2, cv2.LINE_AA)
 
     return img
 

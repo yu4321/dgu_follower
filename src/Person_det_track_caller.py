@@ -69,7 +69,7 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
     global waitStartedTime
     global isWorking
 
-    if(isWorking == True):
+    if(isWorking == True or darknets == None):
         print('atomic blocked')
         return img
     try:
@@ -81,21 +81,27 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
             isIdLost = True
 
             trk: tracker.Tracker
+            #print('print g et detects : ',len(detects))
             for trk in detects:
                 x_cv2 = trk.box
+                print('cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
                 # 사용 불가 박스는 넘김
                 if (trk.isBoxValid() == False):
+                    print('box not valid ', trk.box)
                     continue
 
                 # 현재 타겟이 없을 경우 : 타겟 획득 행동
                 if (currentTarget == None):
-                    if (trk.score > 0.8):
+                    #print('try get target')
+                    if (trk.score > 0.3):
+                        #print('score bigger')
                         RegisterTarget(trk, img)
                         currentFollow = trk.id
 
                 # 현재 트래커의 id가 현재 추적 id와 같을 경우
                 if (trk.id == currentFollow):
                     isIdLost = False
+                    #print('try draw')
                     RefreshTargetData(trk, img, depth_img)
                     currentTurn = currentTarget.lastDirection
                     img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
@@ -111,7 +117,9 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
                     ChangeModeToFarSearching()
                     waitStartedTime = time.time()
             else:
-                driveToTarget()
+                #driveToTarget()
+                print('current Target : ',currentTarget.latestTracker.box, ' current Distance : ',currentTarget.latestDistance)
+                rawDrive(currentTarget.latestTracker, currentTarget.latestDistance)
             #return img
 
         elif currentMode == Mode.FarSearching:
@@ -122,20 +130,26 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
 
             trk: tracker.Tracker
             for trk in detects:
+                x_cv2 = trk.box
                 # 사용 불가 박스는 넘김
                 if (trk.isBoxValid() == False):
+                    print('box not valid ', trk.box)
                     continue
-                if (trk.score > 0.8):
+                if (trk.score > 0.3):
                     RegisterTarget(trk, img)
                     currentFollow = trk.id
                     ChangeModeToChasing()
                     break
+                img = helpers.draw_box_label(trk.id, img, x_cv2)
             if currentMode == Mode.FarSearching:
                 if time.time() - waitStartedTime > 30:
                     DisposeTarget()
                     ChangeModeToChasing()
 
         # cv2.imshow("frame", img)
+    except:
+        print('pipeline error ')
+        raise
     finally:
         isWorking = False
         return img
@@ -177,13 +191,43 @@ def IdentifyTarget(trk : tracker.Tracker, img):
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
 
-    currentTarget = target.Target()
-    currentTarget.firstTracker = trk
-    currentTarget.latestTracker = trk
+    try:
+        currentTarget = target.Target()
+        currentTarget.firstTracker = trk
+        currentTarget.latestTracker = trk
 
-    x_cv2 = trk.box
-    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-    currentTarget.firstImg = img[top:bottom, left:right]
+        x_cv2 = trk.box
+        left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        currentTarget.firstImg = img[top:bottom, left:right]
+
+        print('target registered : ', trk.id)
+    except:
+        print('register target error')
+        raise
+
+def rawDrive(trk:tracker.Tracker, distance):
+    global move
+    print('rawDrive enter. width : ',W)
+
+    half = W/2
+    center = trackerCore.GetCenterOfTracker(trk)
+    posProto =center - half
+    pos = posProto / half
+
+    #pos = (trackerCore.GetCenterOfTracker(trk) - (trackerCore.W /2)) / (trackerCore.W/2)
+    print('pos ',pos)
+    if pos != 0:
+        move.linear.x = 0.5
+    else:
+        move.linear.x = 0
+    move.angular.z = pos * -0.5
+
+    if (distance < 500):
+        print("so close. stop")
+        move.linear.x = 0
+        # move.angular.z = move.angular.z*0.05
+
+    pub.publish(move)
 
 def drive(pos, distance):
     global move
@@ -225,9 +269,11 @@ def driveToTarget():
             move.linear.x = 0.4
 
         if(currentTurn == Direction.Right):
-            move.angular.z = -0.2
+            move.angular.z = -0.1
         elif currentTurn == Direction.Left:
-            move.angular.z = 0.2
+            move.angular.z = 0.1
+        else:
+            move.angular.z = 0
 
         # else:
         #     if(lastTurn == Direction.Right):
@@ -293,8 +339,10 @@ if __name__ == "__main__":
 
             msg=rospy.wait_for_message('/camera/color/image_raw',Image)
             data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
-            darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes)
-
+            try:
+                darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes, 1)
+            except:
+                darknets=None
             #print(darknets)
 
             start=time.time()
@@ -310,13 +358,17 @@ if __name__ == "__main__":
             #PrintCenterDistance(W,H,cv_image)
 
             start = time.time()
-            new_img = pipeline(img, cv_image, darknets.bounding_boxes)
+            if(darknets == None):
+                new_img = pipeline(img,cv_image,None)
+            else:
+                new_img = pipeline(img, cv_image, darknets.bounding_boxes)
             endpipeline=time.time()-start
 
             start = time.time()
             try:
                 cv2.imshow('frame', new_img)
             except:
+                print('exception show')
                 continue
 
             endimshow=time.time()-start
