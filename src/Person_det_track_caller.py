@@ -10,7 +10,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"]="-1"
 
 import rospy
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 from darknet_ros_msgs.msg import BoundingBoxes
@@ -30,6 +30,8 @@ import cv2
 import person_tracker_core as tcore
 
 import target
+
+from target import LidarData
 
 from person_tracker_core import Direction, Mode
 
@@ -60,6 +62,8 @@ waitStartedTime: time = None
 
 isWorking=False
 
+lastFrontLidarData : LidarData=None
+
 def pipeline(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global currentTarget
@@ -69,8 +73,14 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
     global waitStartedTime
     global isWorking
 
-    if(isWorking == True or darknets == None):
+    if(isWorking == True):
         print('atomic blocked')
+        UseLidarDataToSpin()
+        return img
+
+    if(darknets == None):
+        print('darknet void')
+        UseLidarDataToSpin()
         return img
     try:
         isWorking = True
@@ -225,8 +235,30 @@ def rawDrive(trk:tracker.Tracker, distance):
         print("so close. stop")
         move.linear.x = 0
         # move.angular.z = move.angular.z*0.05
-
+    UseLidarDataToSpin()
     pub.publish(move)
+
+def UseLidarDataToSpin():
+    global lastFrontLidarData
+    global move
+    if(lastFrontLidarData == None or time.time() - lastFrontLidarData.inserted > 1):
+        return
+    else:
+        alert = lastFrontLidarData.GetObstacleScore()
+        print('get obstacle data : ', alert.Direction,", ",alert.score)
+        if(alert.Direction != Direction.Center):
+            if(alert.Direction == Direction.Right):
+                move.angular.z += 3
+                return
+            else:
+                move.angular.z += -3
+                return
+        else:
+            if alert.score == 1:
+                print('start avoid front obstacle')
+                standTurn(Direction.Left)
+                print('end')
+            return
 
 def drive(pos, distance):
     global move
@@ -299,6 +331,10 @@ def PrintCenterDistance(x, y, depth_img):
         'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], depth_img[int(pix[1]), int(pix[0])]))
     sys.stdout.flush()
 
+def f_lidar_callback(data):
+    global lastFrontLidarData
+    lastFrontLidarData= LidarData(data.ranges)
+
 if __name__ == "__main__":
     print('current path : ',os.getcwd())
     currentFollow=-1
@@ -321,6 +357,7 @@ if __name__ == "__main__":
         rospy.init_node('follower')
         print('node inited')
         pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+        subLidarF = rospy.Subscriber("laser_f/scan", LaserScan, f_lidar_callback)
         print('published')
 
         print('will start loop now')
