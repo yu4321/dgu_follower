@@ -236,7 +236,18 @@ def rawDrive(trk:tracker.Tracker, distance):
         move.linear.x = 0
         # move.angular.z = move.angular.z*0.05
     UseLidarDataToSpin()
+    TryBoost(distance)
     pub.publish(move)
+
+def TryBoost(distance):
+    global move
+    if(move.linear.x <=0):
+        return
+    difff = (distance - 500)/2000
+    if(difff > 0.2):
+        difff =0.2
+    move.linear.x += difff
+
 
 def UseLidarDataToSpin():
     global lastFrontLidarData
@@ -248,14 +259,20 @@ def UseLidarDataToSpin():
         print('get obstacle data : ', alert.Direction,", ",alert.score)
         if(alert.Direction != Direction.Center):
             if(alert.Direction == Direction.Right):
-                move.angular.z += alert.score
-                if(move.linear.x >0):
-                    move.linear.x -=alert.score
+                print('stand turn obs left start ',time.time())
+                standTurn(Direction.Left)
+                print('stand turn obs left finish', time.time())
+                # move.angular.z += alert.score
+                # if(move.linear.x >0):
+                #     move.linear.x -=alert.score
                 return
             else:
-                move.angular.z += -1 * alert.score
-                if (move.linear.x > 0):
-                    move.linear.x -= alert.score
+                print('stand turn obs right start ', time.time())
+                standTurn(Direction.Right)
+                print('stand turn obs right finish', time.time())
+                # move.angular.z += -1 * alert.score
+                # if (move.linear.x > 0):
+                #     move.linear.x -= alert.score
                 return
         else:
             if alert.score == 1:
@@ -285,6 +302,7 @@ def standTurn(direction : Direction):
         move.angular.z = -0.2
     elif direction == Direction.Left:
         move.angular.z = 0.2
+    move.linear.x=0
     pub.publish(move)
     time.sleep(0.1)
 
