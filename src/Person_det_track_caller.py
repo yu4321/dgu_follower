@@ -248,10 +248,14 @@ def UseLidarDataToSpin():
         print('get obstacle data : ', alert.Direction,", ",alert.score)
         if(alert.Direction != Direction.Center):
             if(alert.Direction == Direction.Right):
-                move.angular.z += 3
+                move.angular.z += alert.score
+                if(move.linear.x >0):
+                    move.linear.x -=alert.score
                 return
             else:
-                move.angular.z += -3
+                move.angular.z += -1 * alert.score
+                if (move.linear.x > 0):
+                    move.linear.x -= alert.score
                 return
         else:
             if alert.score == 1:

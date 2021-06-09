@@ -24,7 +24,7 @@ class ObstacleAlert():
 class LidarData():
 
     def __init__(self, ranges:[]):
-        thr = 0.60
+        thr = 0.5
 
 
         #print(ranges[345], ranges[330], ranges[315], ranges[300], ranges[285] ,ranges[270], ranges[0] ,ranges[15] ,ranges[30], ranges[45], ranges[60], ranges[75], ranges[90])
@@ -52,15 +52,16 @@ class LidarData():
         leftscore = self.L15*0.5 + self.L30 * 0.4 + self.L45 * 0.3 + self.L60 * 0.2 + self.L75 * 0.1
         rightscore = self.R15*0.5 + self.R30 * 0.4 + self.R45 * 0.3 + self.R60 * 0.2 + self.R75 * 0.1
 
+        print('leftscore : ',leftscore, ', rightscore : ',rightscore)
         dir = Direction.Center
         score = 0
         if(leftscore == rightscore == 0):
             return ObstacleAlert(Direction.Center, 0)
         if(leftscore != rightscore and leftscore<rightscore):
             dir = Direction.Left
-            score =1
+            score =rightscore
         else:
             dir = Direction.Right
-            score =1
+            score =leftscore
 
         return ObstacleAlert(dir,score)
