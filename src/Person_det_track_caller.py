@@ -130,7 +130,7 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
         if (trk.isBoxValid() == False):
             print('cl box not valid ', trk.box)
             continue
-        if (trk.id == currentFollow)
+        if (trk.id == currentFollow):
             isIdLost = False
             RefreshTargetData(trk, img, depth_img)
             img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
@@ -163,6 +163,8 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
 
     if(driveMode):
         newRawDrive()
+    else:
+        print('no drive mode')
 
     return img
 
@@ -246,7 +248,7 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
         return img
 
     isWorking=True
-    if(currentTarget!=None):
+    if(currentTarget==None):
         img= preTargetLoop(img,depth_img,darknets)
     else:
         if(currentMode == Mode.Chasing):
@@ -434,6 +436,8 @@ def newRawDrive():
     if (distance < 500):
         print("so close. stop")
         move.linear.x = 0
+    else:
+        move.linear.x=0.5
     TryBoost(distance)
 
     move.angular.z = pos * -0.5
