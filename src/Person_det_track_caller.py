@@ -101,7 +101,7 @@ def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
             continue
         # 현재 타겟이 없을 경우 : 타겟 획득 행동
         if (currentTarget == None):
-            if (IdentifyTarget(trk,img)):
+            if (IdentifyTarget(trk,img, depth_img)):
                 RegisterTarget(trk, img)
                 ChangeModeToChasing()
                 currentFollow = trk.id
@@ -148,17 +148,20 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
         return img
 
     # nowObsInfo = lastFrontLidarData.GetObstacleScore()
+    # print('cur obs : direction ',nowObsInfo.Direction, ', score : ',nowObsInfo.score)
+    # lastObstacleDirection = nowObsInfo.Direction
+    # lastObstacleScore = nowObsInfo.score
     # if(nowObsInfo.score != 0) :
     #     if (nowObsInfo.Direction == Direction.Center ):
-    #         print('start large Stand Turn ',time.time())
-    #         while(True):
-    #             standTurn(Direction.Left)
-    #             curObsInfo = lastFrontLidarData.GetObstacleScore()
-    #             if(curObsInfo.Direction==Direction.Center and curObsInfo.score != 0):
-    #                 continue
-    #             else:
-    #                 break
-    #         print('end large Stand Turn ',time.time())
+    #         # print('start large Stand Turn ',time.time())
+    #         # while(True):
+    #         #     standTurn(Direction.Left)
+    #         #     curObsInfo = lastFrontLidarData.GetObstacleScore()
+    #         #     if(curObsInfo.Direction==Direction.Center and curObsInfo.score != 0):
+    #         #         continue
+    #         #     else:
+    #         #         break
+    #         # print('end large Stand Turn ',time.time())
     #     else:
     #         lastObstacleDirection = nowObsInfo.Direction
     #         lastObstacleScore = nowObsInfo.score
@@ -191,7 +194,7 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if (isTargetFound == False):
-                if (ReidentifyTarget(trk, img)):
+                if (ReidentifyTarget(trk, img, depth_img)):
                     isTargetFound = True
                     RefreshTargetData(trk, img, depth_img)
                     ChangeModeToChasing()
@@ -222,7 +225,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if(isTargetFound==False):
-                if (ReidentifyTarget(trk, img)):
+                if (ReidentifyTarget(trk, img, depth_img)):
                     isTargetFound=True
                     RefreshTargetData(trk, img, depth_img)
                     ChangeModeToChasing()
@@ -248,6 +251,8 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
     global lastTurn
     global waitStartedTime
     global isWorking
+    global lastObstacleDirection
+    global lastObstacleScore
     
     #중복실행 방지
     if(isWorking == True):
@@ -255,6 +260,11 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
         return img
 
     isWorking=True
+    # if(lastFrontLidarData!=None):
+    #     nowObsInfo = lastFrontLidarData.GetObstacleScore()
+    #     print('cur obs : direction ',nowObsInfo.Direction, ', score : ',nowObsInfo.score)
+    #     lastObstacleDirection = nowObsInfo.Direction
+    #     lastObstacleScore = nowObsInfo.score
     if(currentTarget==None):
         img= preTargetLoop(img,depth_img,darknets)
     else:
@@ -342,7 +352,9 @@ def newRawDrive():
     global currentTurn
     global lastObstacleDirection
     global lastObstacleScore
+    global lastFrontLidarData
     #print('newRawDrive enter. width : ', W)
+
 
     trk = currentTarget.latestTracker
     distance =currentTarget.latestDistance
@@ -374,6 +386,14 @@ def newRawDrive():
     if(currentTurn == Direction.Center):
         move.angular.z = 0
 
+    currentLidar = lastFrontLidarData.GetObstacleScore()
+    if(currentLidar.score != 0 ):
+        if(currentLidar.Direction == Direction.Right):
+            standTurn(Direction.Right, False)
+        else:
+            standTurn(Direction.Left, False)
+        return
+
     if(lastObstacleDirection == currentTurn):
         if(currentTurn == Direction.Right):
             move.angular.z += -1 * lastObstacleScore
@@ -394,7 +414,7 @@ def TryBoost(distance):
         difff =0.3
     move.linear.x += difff
 
-def standTurn(direction : Direction):
+def standTurn(direction : Direction, isSleep = True):
     global move
     if (direction == Direction.Right):
         move.angular.z = -0.2
@@ -403,7 +423,8 @@ def standTurn(direction : Direction):
     move.linear.x=0
     if(driveMode):
         pub.publish(move)
-        time.sleep(0.1)
+        if(isSleep):
+            time.sleep(0.1)
 
 def DisposeTarget():
     global  currentTarget

@@ -48,19 +48,29 @@ class LidarData():
 
     def GetObstacleScore(self):
         thr = 0.5
-        front = min(self.C0, self. L15, self.L30, self.R15, self.R30)
+        front = min(self.C0, self. L15, self.L30, self.L45, self.R15, self.R30, self.R45)
         if(front < thr):
-            leftscore = self.L45 * 1 + self.L60 * 1.5 + self.L75 * 2 + self.L90 * 3
-            rightscore= self.R45 * 1 + self.R60 * 1.5 + self.R75 * 2 + self.R90 * 3
+            leftmin = min(self.L45, self.L60, self.L75, self.L90)#self.L45 * 1 + self.L60 * 1.5 + self.L75 * 2 + self.L90 * 3
+            rightmin= min(self.R45, self.R60, self.R75, self.R90) #self.R45 * 1 + self.R60 * 1.5 + self.R75 * 2 + self.R90 * 3
 
-            if(abs(leftscore-rightscore) > 0.1):
-                print('left - right abs = ',abs(leftscore-rightscore))
-                return ObstacleAlert(Direction.Center,1)
+            print('GetOBS leftmin : ',leftmin, 'rightmin : ',rightmin)
+            if(leftmin<thr):
+                return ObstacleAlert(Direction.Left,1)
             else:
-                if(leftscore<rightscore):
-                    return ObstacleAlert(Direction.Left,1)
-                else:
-                    return ObstacleAlert(Direction.Right, 1)
+                return ObstacleAlert(Direction.Right,1)
+            # print('leftmin : ',leftmin, ', rightmin : ',rightmin)
+            # if(abs(leftmin-rightmin) < 0.1):
+            # leftsum = sum([self.L45, self.L60, self.L75,self.L90])  # self.L45 * 1 + self.L60 * 1.5 + self.L75 * 2 + self.L90 * 3
+            # rightsum = sum([self.R45, self.R60, self.R75,self.R90])  # self.R45 * 1 + self.R60 * 1.5 + self.R75 * 2 + self.R90 * 3
+            #
+            # print('leftsum : ', leftsum, ', rightsum : ', rightsum)
+            # if (abs(leftsum - rightsum) < 0.1):
+                return ObstacleAlert(Direction.Center,1)
+            # else:
+            #     if(leftsum<rightsum):
+            #         return ObstacleAlert(Direction.Left,1)
+            #     else:
+            #         return ObstacleAlert(Direction.Right, 1)
         else:
             return ObstacleAlert(Direction.Center, 0)
             # return ObstacleAlert(Direction.Center,1)
