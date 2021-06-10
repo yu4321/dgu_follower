@@ -8,7 +8,7 @@ import time
 import os
 
 import rospy
-from sensor_msgs.msg import Image, LaserScan
+from sensor_msgs.msg import Image, CompressedImage, LaserScan
 from geometry_msgs.msg import Twist
 from cv_bridge import CvBridge
 from darknet_ros_msgs.msg import BoundingBoxes
@@ -77,6 +77,11 @@ isWorking=False
 #마지막으로 감지된 라이다 데이터. 파이프라인과 무관하게 계속 갱신됨
 lastFrontLidarData : LidarData=None
 
+lastImageData : Image = None
+lastYoloData : BoundingBoxes = None
+lastYoloAddedTime : time = None
+lastDepthData : Image = None
+
 def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global currentMode
@@ -89,7 +94,7 @@ def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
     trk: tracker.Tracker
     for trk in detects:
         x_cv2 = trk.box
-        print('pt cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
+        # print('pt cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
             print('pt box not valid ', trk.box)
@@ -125,7 +130,7 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
     trk: tracker.Tracker
     for trk in detects:
         x_cv2 = trk.box
-        print('cl cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+        #print('cl cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
             print('cl box not valid ', trk.box)
@@ -201,6 +206,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     global currentTarget
     global currentFollow
     global waitStartedTime
+    global lastTurn
     isTargetFound=False
     if(darknets!=None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
@@ -224,7 +230,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        standTurn(currentTarget.lastDirection)
+        standTurn(lastTurn)
         if(waitStartedTime - time.time() > 3):
             ChangeModeToFarSearching()
     return img
@@ -261,93 +267,6 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
     isWorking=False
     return img
 
-    #바운딩 박스 미감지시
-    if(darknets == None):
-        print('darknet void')
-        UseLidarDataToSpin()
-        return img
-    try:
-        isWorking = True
-
-        detects = trackerCore.get_darknet_trackers(img,darknets)
-
-        if currentMode == Mode.Chasing:
-            isIdLost = True
-
-            trk: tracker.Tracker
-            #print('print g et detects : ',len(detects))
-            for trk in detects:
-                x_cv2 = trk.box
-                print('cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
-                # 사용 불가 박스는 넘김
-                if (trk.isBoxValid() == False):
-                    print('box not valid ', trk.box)
-                    continue
-
-                # 현재 타겟이 없을 경우 : 타겟 획득 행동
-                if (currentTarget == None):
-                    #print('try get target')
-                    if (trk.score > 0.3):
-                        #print('score bigger')
-                        RegisterTarget(trk, img)
-                        currentFollow = trk.id
-
-                # 현재 트래커의 id가 현재 추적 id와 같을 경우
-                if (trk.id == currentFollow):
-                    isIdLost = False
-                    #print('try draw')
-                    RefreshTargetData(trk, img, depth_img)
-                    currentTurn = currentTarget.lastDirection
-                    img = helpers.draw_box_label_Trac(trk, img, (0, 0, 255), True, currentTarget.latestDistance)
-
-                else:
-                    img = helpers.draw_box_label(trk.id, img, x_cv2)
-
-            # id 소실시 follow는 제거됨. 추적 모드로 들어가야 하니까
-            if (isIdLost):
-                # currentFollow = -1
-                # currentMode = Mode.NearSearching
-                if (currentTarget != None):
-                    ChangeModeToFarSearching()
-                    waitStartedTime = time.time()
-            else:
-                #driveToTarget()
-                print('current Target : ',currentTarget.latestTracker.box, ' current Distance : ',currentTarget.latestDistance)
-                rawDrive(currentTarget.latestTracker, currentTarget.latestDistance)
-            #return img
-
-        elif currentMode == Mode.FarSearching:
-            if(lastTurn != Direction.Center):
-                print('start stand turn to ',currentTarget.lastDirection)
-                standTurn(currentTarget.lastDirection)
-                lastTurn=Direction.Center
-
-            trk: tracker.Tracker
-            for trk in detects:
-                x_cv2 = trk.box
-                # 사용 불가 박스는 넘김
-                if (trk.isBoxValid() == False):
-                    print('box not valid ', trk.box)
-                    continue
-                if (trk.score > 0.3):
-                    RegisterTarget(trk, img)
-                    currentFollow = trk.id
-                    ChangeModeToChasing()
-                    break
-                img = helpers.draw_box_label(trk.id, img, x_cv2)
-            if currentMode == Mode.FarSearching:
-                if time.time() - waitStartedTime > 30:
-                    DisposeTarget()
-                    ChangeModeToChasing()
-
-        # cv2.imshow("frame", img)
-    except:
-        print('pipeline error ')
-        raise
-    finally:
-        isWorking = False
-        return img
-
 
 def ChangeModeToChasing():
     global currentMode
@@ -364,8 +283,11 @@ def ChangeModeToFarSearching():
 def ChangeModeToNearSearching():
     global currentMode
     global waitStartedTime
+    global lastTurn
+    global currentTarget
     currentMode = Mode.NearSearching
     waitStartedTime=time.time()
+    lastTurn = currentTarget.lastDirection
     print('current mode changed to nearsearching at ',waitStartedTime)
 
 
@@ -414,7 +336,7 @@ def newRawDrive():
     global currentTurn
     global lastObstacleDirection
     global lastObstacleScore
-    print('newRawDrive enter. width : ', W)
+    #print('newRawDrive enter. width : ', W)
 
     trk = currentTarget.latestTracker
     distance =currentTarget.latestDistance
@@ -424,7 +346,7 @@ def newRawDrive():
     posProto = center - half
     pos = posProto / half
 
-    print('pos ', pos)
+    #print('current pos ', pos)
     if(abs(pos) <= 0.1):
         currentTurn = Direction.Center
     else:
@@ -432,7 +354,8 @@ def newRawDrive():
             currentTurn = Direction.Right
         else:
             currentTurn = Direction.Left
-    print('rawdrive - currentTurn is ',currentTurn)
+    print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
+
     if (distance < 500):
         print("so close. stop")
         move.linear.x = 0
@@ -442,14 +365,17 @@ def newRawDrive():
 
     move.angular.z = pos * -0.5
 
+    if(currentTurn == Direction.Center):
+        move.angular.z = 0
+
     if(lastObstacleDirection == currentTurn):
         if(currentTurn == Direction.Right):
             move.angular.z += -1 * lastObstacleScore
         else:
             move.angular.z += lastObstacleScore
     if (distance < 500):
-        print("so close. stop")
-        move.linear.x = 0
+        print("so close. no turn")
+        move.angular.z = 0
     pub.publish(move)
     return
 
@@ -482,8 +408,8 @@ def TryBoost(distance):
     if(move.linear.x <=0):
         return
     difff = (distance - 500)/2000
-    if(difff > 0.25):
-        difff =0.25
+    if(difff > 0.5):
+        difff =0.5
     move.linear.x += difff
 
 
@@ -536,14 +462,15 @@ def drive(pos, distance):
     pub.publish(move)
 
 def standTurn(direction : Direction):
-
+    global move
     if (direction == Direction.Right):
         move.angular.z = -0.2
     elif direction == Direction.Left:
         move.angular.z = 0.2
     move.linear.x=0
-    pub.publish(move)
-    time.sleep(0.1)
+    if(driveMode):
+        pub.publish(move)
+        time.sleep(0.1)
 
 def driveToTarget():
 
@@ -594,7 +521,25 @@ def PrintCenterDistance(x, y, depth_img):
 
 def f_lidar_callback(data):
     global lastFrontLidarData
+    #print('lidar data plus')
     lastFrontLidarData= LidarData(data.ranges)
+
+def darknet_callback(data):
+    global lastYoloData
+    global lastYoloAddedTime
+    lastYoloData=data
+    lastYoloAddedTime=time.time()
+    #print('yolo data plus')
+
+def detImage_callback(data):
+    global lastImageData
+    lastImageData=data
+    #print('image data plus')
+
+def depImage_callback(data):
+    global lastDepthData
+    lastDepthData=data
+    #print('depth data plus')
 
 if __name__ == "__main__":
     print('current path : ',os.getcwd())
@@ -619,6 +564,9 @@ if __name__ == "__main__":
         print('node inited')
         pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
         subLidarF = rospy.Subscriber("laser_f/scan", LaserScan, f_lidar_callback)
+        darknetY=rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, darknet_callback)
+        detImage=rospy.Subscriber('/camera/color/image_raw', Image, detImage_callback)
+        depImage=rospy.Subscriber('/camera/depth/image_rect_raw', Image,depImage_callback)
         print('published')
 
         print('will start loop now')
@@ -634,13 +582,28 @@ if __name__ == "__main__":
             else:
                 continue
 
-            msg=rospy.wait_for_message('/camera/color/image_raw',Image)
-            data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
-            try:
-                darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes, 1)
-            except:
-                darknets=None
+            # msg=rospy.wait_for_message('/camera/color/image_raw',Image)
+            # data=rospy.wait_for_message('/camera/depth/image_rect_raw', Image)
+            # try:
+            #     darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes, 1)
+            # except:
+            #     darknets=None
             #print(darknets)
+
+
+            msg=lastImageData
+            data =lastDepthData
+            darknets=lastYoloData
+
+
+            if msg == None or data == None:
+                continue
+
+            if lastYoloAddedTime != None:
+                if(time.time() - lastYoloAddedTime < 0.5):
+                    darknets = lastYoloData
+                else:
+                    darknets=None
 
             start=time.time()
             img=ncv2.imgmsg_to_cv2(msg, "bgr8")

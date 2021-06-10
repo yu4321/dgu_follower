@@ -79,8 +79,8 @@ class PersonTrackerCore:
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         center = left + ((right - left) / 2)
-        print('box :',left,top,right,bottom)
-        print('center : ',center)
+        #print('box :',left,top,right,bottom)
+        #print('center : ',center)
         return center
 
     def GetDirectionOfTracker(self, trk:tracker.Tracker):

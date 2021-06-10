@@ -53,11 +53,17 @@ class LidarData():
 
     def GetObstacleScore(self):
         thr = 0.5
-        if(self.C0 > thr):
-            return ObstacleAlert(Direction.Center, 1)
+        front = max(self.C0, self. L15, self.L30, self.R15, self.R30)
+        if(front > thr):
+            return ObstacleAlert(Direction.Center,1)
+        # if(self.C0 > thr):
+        #     return ObstacleAlert(Direction.Center, 1)
 
-        leftscore = self.L15*0.5 + self.L30 * 0.4 + self.L45 * 0.3 + self.L60 * 0.2 + self.L75 * 0.1
-        rightscore = self.R15*0.5 + self.R30 * 0.4 + self.R45 * 0.3 + self.R60 * 0.2 + self.R75 * 0.1
+        # leftscore = self.L15*0.5 + self.L30 * 0.4 + self.L45 * 0.3 + self.L60 * 0.2 + self.L75 * 0.1
+        # rightscore = self.R15*0.5 + self.R30 * 0.4 + self.R45 * 0.3 + self.R60 * 0.2 + self.R75 * 0.1
+
+        leftscore =  self.L45 * 0.3 + self.L60 * 0.2 + self.L75 * 0.1
+        rightscore = self.R45 * 0.3 + self.R60 * 0.2 + self.R75 * 0.1
 
         print('leftscore : ',leftscore, ', rightscore : ',rightscore)
         dir = Direction.Center
