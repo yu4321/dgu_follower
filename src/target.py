@@ -48,7 +48,7 @@ class LidarData():
 
     def GetObstacleScore(self):
         thr = 0.5
-        front = min(self.C0, self. L15, self.L30, self.L45, self.R15, self.R30, self.R45)
+        front = min(self.C0, self. L15, self.L30, self.L45, self.R15, self.R30, self.R45,self.L60,self.R60)
         if(front < thr):
             leftmin = min(self.L45, self.L60, self.L75, self.L90)#self.L45 * 1 + self.L60 * 1.5 + self.L75 * 2 + self.L90 * 3
             rightmin= min(self.R45, self.R60, self.R75, self.R90) #self.R45 * 1 + self.R60 * 1.5 + self.R75 * 2 + self.R90 * 3

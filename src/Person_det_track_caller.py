@@ -237,7 +237,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     if(isTargetFound == False):
         standTurn(lastTurn)
         if(waitStartedTime - time.time() > 3):
-            ChangeModeToFarSearching()
+            DisposeTarget()
     return img
 
 #메인 루프
@@ -321,14 +321,20 @@ def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
     return
 
 def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
-    tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    if(trk.score > detectBaseScore and tDistance<3000):
+    ttDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
+    if(trk.score > detectBaseScore and ttDistance<5000):
         return True
 
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    if(trk.score > detectBaseScore and abs(tDistance - currentTarget.latestDistance) < 2000):
+    if (trk.score > detectBaseScore and tDistance < 5000):
         return True
+    # tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
+    # distance = currentTarget.latestDistance
+    # if(distance > 5000):
+    #     distance=5000
+    # if(trk.score > detectBaseScore and abs(tDistance - distance) < 1000):
+    #     return True
 
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
@@ -378,7 +384,7 @@ def newRawDrive():
         print("so close. stop")
         move.linear.x = 0
     else:
-        move.linear.x=0.5
+        move.linear.x=0.4
     TryBoost(distance)
 
     move.angular.z = pos * -0.5
@@ -409,17 +415,17 @@ def TryBoost(distance):
     global move
     if(move.linear.x <=0):
         return
-    difff = (distance - 500)/2000
-    if(difff > 0.3):
-        difff =0.3
+    difff = (distance - 500)/6000
+    if(difff > 0.5):
+        difff =0.5
     move.linear.x += difff
 
 def standTurn(direction : Direction, isSleep = True):
     global move
     if (direction == Direction.Right):
-        move.angular.z = -0.2
+        move.angular.z = -0.5
     elif direction == Direction.Left:
-        move.angular.z = 0.2
+        move.angular.z = 0.5
     move.linear.x=0
     if(driveMode):
         pub.publish(move)
