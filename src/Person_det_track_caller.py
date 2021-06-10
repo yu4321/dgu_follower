@@ -32,7 +32,7 @@ from person_tracker_core import Direction, Mode
 W = 640
 H = 480
 
-detectBaseScore = 0.5
+detectBaseScore = 0.3
 
 # 얘네 둘은 무시
 # Global variables to be used by funcitons of VideoFileClop
@@ -322,12 +322,12 @@ def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
 
 def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    if(trk.score > detectBaseScore):
+    if(trk.score > detectBaseScore and tDistance<3000):
         return True
 
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    if(trk.score > detectBaseScore):
+    if(trk.score > detectBaseScore and abs(tDistance - currentTarget.latestDistance) < 2000):
         return True
 
 def RegisterTarget(trk: tracker.Tracker, img):
@@ -387,7 +387,7 @@ def newRawDrive():
         move.angular.z = 0
 
     currentLidar = lastFrontLidarData.GetObstacleScore()
-    if(currentLidar.score != 0 ):
+    if(currentLidar.score != 0 and distance >=500):
         if(currentLidar.Direction == Direction.Right):
             standTurn(Direction.Right, False)
         else:
@@ -462,7 +462,7 @@ def depImage_callback(data):
 if __name__ == "__main__":
     print('current path : ',os.getcwd())
     currentFollow=-1
-    driveMode=False
+    driveMode=True
     det = detector.PersonDetector()
 
     if debug: # test on a sequence of images
