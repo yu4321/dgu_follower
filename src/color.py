@@ -79,6 +79,7 @@ def dominant_color(img):
     #cv2.waitKey(0)
     return hsv[0]
 
+#이미지 4분할 후 h 채널 추출
 def img_crop(img):
     height, width, _ = np.shape(img)
 
@@ -95,8 +96,3 @@ def img_crop(img):
     print(h1, h2, h3, h4)
 
     return (h1, h2, h3, h4)
-
-#if __name__ == "__main__":
-    # START HERE
-    #img = cv2.imread('test2.png')
-    #img_crop(img)
