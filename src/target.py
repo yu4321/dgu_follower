@@ -15,6 +15,7 @@ class Target():
         self.latestDistance: float = 0
         self.guid:uuid.uuid4()
         self.lastDirection = Direction.Center
+        self.firstColors=[]
 
 class ObstacleAlert():
 

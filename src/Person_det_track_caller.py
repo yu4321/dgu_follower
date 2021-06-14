@@ -12,6 +12,8 @@ from darknet_ros_msgs.msg import BoundingBoxes
 import matplotlib.pyplot as plt
 import glob
 
+import color
+
 import helpers
 import detector
 import tracker
@@ -326,6 +328,12 @@ def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
 
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
+    x_cv2 = trk.box
+    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+    curImg= img[top:bottom, left:right]
+    t = time.time()
+    tryColor = color.img_crop(curImg)
+    print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
     if (trk.score > detectBaseScore and tDistance < 5000):
         return True
     # tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
@@ -343,10 +351,13 @@ def RegisterTarget(trk: tracker.Tracker, img):
         currentTarget.firstTracker = trk
         currentTarget.latestTracker = trk
 
+
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         currentTarget.firstImg = img[top:bottom, left:right]
-
+        t = time.time()
+        currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
+        print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
         print('target registered : ', trk.id)
     except:
         print('register target error')
