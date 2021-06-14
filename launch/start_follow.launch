@@ -1,4 +1,8 @@
 
 <launch>
- <node name="dgu_follower_node" pkg="dgu_follower" type="Person_det_track_caller.py" />
+ <include file="$(find rplidar_ros)/launch/rplidar_all.launch"/>
+ <include file="$(find realsense2_camera)/launch/rs_camera.launch"/>
+ <include file="$(find scout_bringup)/launch/scout_minimal.launch"/>
+ <include file="$(find darknet_ros)/launch/yolo_v3.launch"/>
+ <!--<node name="dgu_follower_node" pkg="dgu_follower" type="Person_det_track_caller.py" />-->
 </launch>

@@ -2,10 +2,7 @@
 
 # -*- coding: utf-8 -*-
 
-import sys
-import time
-
-import os
+import sys, termios, tty, os, time, select
 
 import rospy
 from sensor_msgs.msg import Image, CompressedImage, LaserScan
@@ -465,6 +462,19 @@ def depImage_callback(data):
     lastDepthData=data
     #print('depth data plus')
 
+def getch():
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        ch = sys.stdin.read(1)
+
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    return ch
+
+button_delay = 0.2
+
 if __name__ == "__main__":
     print('current path : ',os.getcwd())
     currentFollow=-1
@@ -498,6 +508,8 @@ if __name__ == "__main__":
         frame_rate = 10
         prev = 0
         while(True):
+            if rospy.is_shutdown():
+                break
             time_elapsed = time.time() - prev
 
             if time_elapsed > 1. / frame_rate:
@@ -562,11 +574,15 @@ if __name__ == "__main__":
             sys.stdout.flush()
 
             pressed = cv2.waitKey(1) & 0xFF
+            # p2 = ''
+            # input = select.select([sys.stdin], [], [], 1)[0]
+            # if input:
+            #     p2 = sys.stdin.readline().rstrip()
 
-            if pressed== ord('q'):
+            if pressed== ord('q'): #or p2 == 'q':
                 print('exit with q')
                 break
-            if pressed == ord('s'):
+            if pressed == ord('s'):# or p2 == 's':
                 driveMode= not driveMode
                 print('drive mode change to '+str(driveMode))
                 if(driveMode == False):
