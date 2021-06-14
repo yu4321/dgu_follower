@@ -318,6 +318,8 @@ def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
     return
 
 def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
+    if(getTargetInNextFrame==False):
+        return
     ttDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
     if(trk.score > detectBaseScore and ttDistance<5000):
         return True
@@ -402,7 +404,7 @@ def newRawDrive():
             move.angular.z += -1 * lastObstacleScore
         else:
             move.angular.z += lastObstacleScore
-    if (distance < 500):
+    if (distance < 500 and currentMode == Mode.Chasing):
         print("so close. no turn")
         move.angular.z = 0
     pub.publish(move)
@@ -462,18 +464,7 @@ def depImage_callback(data):
     lastDepthData=data
     #print('depth data plus')
 
-def getch():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(sys.stdin.fileno())
-        ch = sys.stdin.read(1)
-
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-    return ch
-
-button_delay = 0.2
+getTargetInNextFrame=False
 
 if __name__ == "__main__":
     print('current path : ',os.getcwd())
@@ -559,7 +550,7 @@ if __name__ == "__main__":
             else:
                 new_img = pipeline(img, cv_image, darknets.bounding_boxes)
             endpipeline=time.time()-start
-
+            getTargetInNextFrame=False
             start = time.time()
             try:
                 cv2.imshow('frame', new_img)
@@ -585,5 +576,10 @@ if __name__ == "__main__":
             if pressed == ord('s'):# or p2 == 's':
                 driveMode= not driveMode
                 print('drive mode change to '+str(driveMode))
-                if(driveMode == False):
-                    DisposeTarget();
+                # if(driveMode == False):
+                #     DisposeTarget();
+            if pressed == ord('d'):
+                if(currentTarget == None):
+                    getTargetInNextFrame=True
+                else:
+                    DisposeTarget()
