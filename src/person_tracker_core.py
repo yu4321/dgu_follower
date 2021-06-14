@@ -88,7 +88,7 @@ class PersonTrackerCore:
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         center = left + ((right - left) / 2)
 
-        print('x center : ',center)
+        #print('x center : ',center)
         #w3=self.W/3
         if center < 130 :
             return Direction.Left
@@ -294,7 +294,7 @@ def get_biggest_distance_of_box(depth_image, tracker:tracker.Tracker) -> float:
     if depth_image is None:
         print('depth image2 not True, break')
         return 0
-    print('minimum distance : ', min, 'mm')
+    #print('minimum distance : ', min, 'mm')
 
     return min
 

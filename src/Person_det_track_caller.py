@@ -12,7 +12,7 @@ from darknet_ros_msgs.msg import BoundingBoxes
 import matplotlib.pyplot as plt
 import glob
 
-import color
+import color as c2
 
 import helpers
 import detector
@@ -26,6 +26,8 @@ import target
 from target import LidarData
 
 from person_tracker_core import Direction, Mode
+
+import numpy as np
 
 # 현재 화면의 가로 세로
 W = 640
@@ -81,6 +83,8 @@ lastYoloData : BoundingBoxes = None
 lastYoloAddedTime : time = None
 lastDepthData : Image = None
 
+color =c2.colorSorter()
+
 def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global currentMode
@@ -96,7 +100,7 @@ def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
         # print('pt cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
-            print('pt box not valid ', trk.box)
+            #print('pt box not valid ', trk.box)
             continue
         # 현재 타겟이 없을 경우 : 타겟 획득 행동
         if (currentTarget == None):
@@ -132,7 +136,7 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
         #print('cl cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
-            print('cl box not valid ', trk.box)
+            #print('cl box not valid ', trk.box)
             continue
         if (trk.id == currentFollow):
             isIdLost = False
@@ -172,8 +176,8 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
 
     if(driveMode):
         newRawDrive()
-    else:
-        print('no drive mode')
+    #else:
+        #print('no drive mode')
 
     return img
 
@@ -186,10 +190,10 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
         trk: tracker.Tracker
         for trk in detects:
             x_cv2 = trk.box
-            print('fs cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+            #print('fs cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
             # 사용 불가 박스는 넘김
             if (trk.isBoxValid() == False):
-                print('fs box not valid ', trk.box)
+                #print('fs box not valid ', trk.box)
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if (isTargetFound == False):
@@ -217,10 +221,10 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
         trk: tracker.Tracker
         for trk in detects:
             x_cv2 = trk.box
-            print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+            #print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
             # 사용 불가 박스는 넘김
             if (trk.isBoxValid() == False):
-                print('ns box not valid ', trk.box)
+                #print('ns box not valid ', trk.box)
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if(isTargetFound==False):
@@ -328,13 +332,25 @@ def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
 
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    x_cv2 = trk.box
-    left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-    curImg= img[top:bottom, left:right]
-    t = time.time()
-    tryColor = color.img_crop(curImg)
-    print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
+
     if (trk.score > detectBaseScore and tDistance < 5000):
+        x_cv2 = trk.box
+        left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+        curImg = img[top:bottom, left:right]
+        t = time.time()
+        tryColor = color.img_crop(curImg)
+        #cv2.imshow('reid ', curImg)
+        #print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
+
+        n1=np.array(currentTarget.firstColors)
+        n2= np.array(tryColor)
+        #print('current firstcolors : ',currentTarget.firstColors)
+        subb=n1-n2
+        #print('matrix minus : ', subb)
+        if(np.max(np.absolute(subb)) <= 50):
+            return True
+        else:
+            return False
         return True
     # tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
     # distance = currentTarget.latestDistance
@@ -359,6 +375,8 @@ def RegisterTarget(trk: tracker.Tracker, img):
         currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
         print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
         print('target registered : ', trk.id)
+
+        #cv2.imshow('target - '+str(currentTarget.firstColors),currentTarget.firstImg)
     except:
         print('register target error')
         raise
@@ -388,10 +406,10 @@ def newRawDrive():
             currentTurn = Direction.Right
         else:
             currentTurn = Direction.Left
-    print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
+    #print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
 
     if (distance < 500):
-        print("so close. stop")
+        #print("so close. stop")
         move.linear.x = 0
     else:
         move.linear.x=0.4
@@ -416,7 +434,7 @@ def newRawDrive():
         else:
             move.angular.z += lastObstacleScore
     if (distance < 500 and currentMode == Mode.Chasing):
-        print("so close. no turn")
+        #print("so close. no turn")
         move.angular.z = 0
     pub.publish(move)
     return
@@ -440,7 +458,7 @@ def standTurn(direction : Direction, isSleep = True):
     if(driveMode):
         pub.publish(move)
         if(isSleep):
-            time.sleep(0.1)
+            time.sleep(0.3)
 
 def DisposeTarget():
     global  currentTarget
