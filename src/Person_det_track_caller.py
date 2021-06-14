@@ -319,13 +319,12 @@ def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
     else:
         currentTarget.latestDistance = tDistance
         lastMin=tDistance
-
     currentTarget.lastDirection = trackerCore.GetDirectionOfTracker(trk)
     return
 
 def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
     if(getTargetInNextFrame==False):
-        return
+        return False
     ttDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
     if(trk.score > detectBaseScore and ttDistance<5000):
         return True
@@ -333,24 +332,41 @@ def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
-    if (trk.score > detectBaseScore and tDistance < 5000):
+    if (trk.score > detectBaseScore and tDistance <= max(5000, currentTarget.latestDistance)):
+        #return True
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         curImg = img[top:bottom, left:right]
         t = time.time()
         tryColor = color.img_crop(curImg)
         #cv2.imshow('reid ', curImg)
-        #print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
+        print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
 
-        n1=np.array(currentTarget.firstColors)
+        n1=np.array(currentTarget.firstColors) #color.img_crop(currentTarget.lastImg))
         n2= np.array(tryColor)
+        print('before n1 ',n1)
+        print('before n2 ',n2)
+        idx=0
+        for x in n1:
+            if(n1[idx] == 0):
+                n1[idx] = n2[idx]
+            idx+=1
+        idx=0
+        for x in n2:
+            if(n2[idx] == 0):
+                n2[idx] = n1[idx]
+            idx+=1
+        print('after n1', n1)
+        print('after n2',n2)
         #print('current firstcolors : ',currentTarget.firstColors)
-        subb=n1-n2
-        #print('matrix minus : ', subb)
-        if(np.max(np.absolute(subb)) <= 50):
-            return True
-        else:
-            return False
+        return IsArraysTolarable(n1,n2)
+        # subb=n1-n2
+        #
+        # print('matrix minus : ', subb)
+        # if(np.max(np.absolute(subb)) <= 50):
+        #     return True
+        # else:
+        #     return False
         return True
     # tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
     # distance = currentTarget.latestDistance
@@ -359,6 +375,14 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     # if(trk.score > detectBaseScore and abs(tDistance - distance) < 1000):
     #     return True
 
+def IsArraysTolarable(n1, n2):
+    arrp=[]
+    for i in range(0,4):
+        arrp.append(abs(int(n1[i])-int(n2[i])))
+    arr= np.array(arrp)
+    if(np.max(arr)<=50):
+        return True
+
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
 
@@ -366,11 +390,11 @@ def RegisterTarget(trk: tracker.Tracker, img):
         currentTarget = target.Target()
         currentTarget.firstTracker = trk
         currentTarget.latestTracker = trk
-
-
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
+
         currentTarget.firstImg = img[top:bottom, left:right]
+        currentTarget.lastImg=currentTarget.firstImg;
         t = time.time()
         currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
         print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
@@ -458,7 +482,7 @@ def standTurn(direction : Direction, isSleep = True):
     if(driveMode):
         pub.publish(move)
         if(isSleep):
-            time.sleep(0.3)
+            time.sleep(1)
 
 def DisposeTarget():
     global  currentTarget

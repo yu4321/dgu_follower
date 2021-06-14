@@ -110,6 +110,6 @@ class colorSorter():
         h3 = self.dominant_color(crop3)
         h4 = self.dominant_color(crop4)
 
-        print(h1, h2, h3, h4)
+        #print(h1, h2, h3, h4)
 
         return (h1, h2, h3, h4)
