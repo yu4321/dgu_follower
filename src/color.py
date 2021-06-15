@@ -113,3 +113,14 @@ class colorSorter():
         #print(h1, h2, h3, h4)
 
         return (h1, h2, h3, h4)
+
+    def img_crop_and_get_dominants(self, img):
+        return True
+
+if __name__ == '__main__':
+    color = colorSorter()
+    img =  cv2.imread('test.jpg')
+    t = time.time()
+    print('start read at ',t)
+    res = color.img_crop(img)
+    print('res : ',res,', elapsed : ',time.time() - t)
