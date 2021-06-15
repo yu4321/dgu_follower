@@ -191,6 +191,7 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     global currentTarget
     global currentFollow
     global waitStartedTime
+    isTargetFound = False
     if (darknets != None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
         trk: tracker.Tracker
@@ -212,7 +213,7 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                     continue
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
-    if(time,time() - waitStartedTime > 30):
+    if(time.time() - waitStartedTime > 30):
         DisposeTarget()
     return img
 
@@ -245,12 +246,13 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        if(nearSearchingTurnCount % 5 != 0):
+        if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
+            print('standturn ns, count ',nearSearchingTurnCount)
             standTurn(lastTurn, False)
         else:
-            print('have to stop now')
+            forceStop()
         nearSearchingTurnCount += 1
-        if(waitStartedTime - time.time() > 3):
+        if(time.time() - waitStartedTime > 10):
             ChangeModeToFarSearching()
             #DisposeTarget()
     return img
@@ -356,20 +358,16 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
     if (trk.score > detectBaseScore and tDistance <= max(5000, currentTarget.latestDistance)):
-        if(isUsingColorSorter==False):
+        if(isUsingColorSorter == False):
             return True
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         curImg = img[top:bottom, left:right]
         t = time.time()
         tryColor = color.img_crop(curImg)
-        #cv2.imshow('reid ', curImg)
-        print('reid color 4 crop time : ', time.time() - t, ', get color : ', tryColor)
 
-        n1=np.array(currentTarget.firstColors) #color.img_crop(currentTarget.lastImg))
+        n1=np.array(currentTarget.firstColors)
         n2= np.array(tryColor)
-        print('before n1 ',n1)
-        print('before n2 ',n2)
         idx=0
         for x in n1:
             if(n1[idx] == 0):
@@ -380,32 +378,36 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
             if(n2[idx] == 0):
                 n2[idx] = n1[idx]
             idx+=1
-        print('after n1', n1)
-        print('after n2',n2)
-        #print('current firstcolors : ',currentTarget.firstColors)
-        return IsArraysTolarable(n1,n2)
-        # subb=n1-n2
-        #
-        # print('matrix minus : ', subb)
-        # if(np.max(np.absolute(subb)) <= 50):
-        #     return True
-        # else:
-        #     return False
-        return True
-    # tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    # distance = currentTarget.latestDistance
-    # if(distance > 5000):
-    #     distance=5000
-    # if(trk.score > detectBaseScore and abs(tDistance - distance) < 1000):
-    #     return True
+
+        res = IsArraysTolarable(n1,n2)
+        if(res == True):
+            print('succeed compare : ',n1,n2)
+            return res
+        else:
+            lastColor = color.img_crop(currentTarget.lastImg)
+            n1 = np.array(lastColor)
+            idx = 0
+            for x in n1:
+                if (n1[idx] == 0):
+                    n1[idx] = n2[idx]
+                idx += 1
+        res= IsArraysTolarable(n1,n2)
+        if(res):
+            print('succeed 2nd compare : ', n1, n2)
+            return True
+        else:
+            return False
+    return False
 
 def IsArraysTolarable(n1, n2):
     arrp=[]
     for i in range(0,4):
         arrp.append(abs(int(n1[i])-int(n2[i])))
     arr= np.array(arrp)
-    if(np.max(arr)<=50):
+    if(np.max(arr)<=30):
         return True
+    else:
+        return False
 
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
@@ -514,6 +516,13 @@ def standTurn(direction : Direction, isSleep = True):
         pub.publish(move)
         if(isSleep):
             time.sleep(0.3)
+
+def forceStop():
+    global move
+    move.angular.z=0
+    move.linear.x=0
+    if(driveMode):
+        pub.publish(move)
 
 def DisposeTarget():
     global  currentTarget
