@@ -68,7 +68,7 @@ class PersonTrackerCore:
 
         self.tracker_list = []  # list for trackers
         # list for track ID
-        #self.track_id_list = deque(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17'])
+        self.track_id_list = deque(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17'])
 
         self.track_id = 0
         self.debug = False
@@ -227,7 +227,7 @@ class PersonTrackerCore:
                 xx = xx.T[0].tolist()
                 xx = [xx[0], xx[2], xx[4], xx[6]]
                 tmp_trk.box = xx
-                tmp_trk.id = self.getTrackId() # assign an ID for the tracker
+                tmp_trk.id = self.track_id_list.popleft() # assign an ID for the tracker
                 tmp_trk.score=scoreBoxes[idx].score
                 print(tmp_trk.id)
                 self.tracker_list.append(tmp_trk)
@@ -251,8 +251,8 @@ class PersonTrackerCore:
                 good_tracker_list.append(trk)
         deleted_tracks = filter(lambda x: x.no_losses > self.max_age, self.tracker_list)
 
-        #for trk in deleted_tracks:
-        #    self.track_id_list.append(trk.id)
+        for trk in deleted_tracks:
+           self.track_id_list.append(trk.id)
 
         self.tracker_list = [x for x in self.tracker_list if x.no_losses <= self.max_age]
 
