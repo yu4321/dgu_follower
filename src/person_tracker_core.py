@@ -33,6 +33,12 @@ class Mode(Enum):
     NearSearching = 2
     FarSearching = 3
 
+class RideMode(Enum):
+    Normal = 1
+    StandTurning = 2
+    RidingObstacle = 3
+    StandStill = 4
+
 class PersonTrackerCore:
 
 

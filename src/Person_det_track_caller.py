@@ -25,7 +25,7 @@ import target
 
 from target import LidarData
 
-from person_tracker_core import Direction, Mode
+from person_tracker_core import Direction, Mode, RideMode
 
 import numpy as np
 
@@ -63,11 +63,14 @@ currentTurn : Direction = Direction.Center
 #마지막 회전 방향. rawDrive면 안 씀
 lastTurn : Direction = Direction.Center
 
+lastObsTurn : Direction = Direction.Center
+
 lastObstacleDirection : Direction = Direction.Center
 lastObstacleScore = 0
 
 #현재 작동 모드
 currentMode: Mode = Mode.Chasing
+currentRideMode : RideMode = RideMode.Normal
 
 #소실 후 타겟 파기까지 30초 기다릴 때 쓰는 변수
 waitStartedTime: time = None
@@ -218,6 +221,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global waitStartedTime
     global lastTurn
+    global nearSearchingTurnCount
     isTargetFound=False
     if(darknets!=None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
@@ -241,9 +245,14 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        standTurn(lastTurn)
+        if(nearSearchingTurnCount % 5 != 0):
+            standTurn(lastTurn, False)
+        else:
+            print('have to stop now')
+        nearSearchingTurnCount += 1
         if(waitStartedTime - time.time() > 3):
-            DisposeTarget()
+            ChangeModeToFarSearching()
+            #DisposeTarget()
     return img
 
 #메인 루프
@@ -287,22 +296,32 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
 
 def ChangeModeToChasing():
     global currentMode
+    global currentRideMode
     print('current mode changed to chasing')
     currentMode = Mode.Chasing
+    currentRideMode = RideMode.Normal
 
 def ChangeModeToFarSearching():
     global currentMode
+    global currentRideMode
     global waitStartedTime
     currentMode = Mode.FarSearching
+    currentRideMode = RideMode.StandStill
     waitStartedTime=time.time()
     print('current mode changed to farsearching at ',waitStartedTime)
 
+nearSearchingTurnCount=0
+
 def ChangeModeToNearSearching():
     global currentMode
+    global currentRideMode
     global waitStartedTime
     global lastTurn
     global currentTarget
+    global nearSearchingTurnCount
+    nearSearchingTurnCount=0
     currentMode = Mode.NearSearching
+    #currentRideMode = RideMode.StandTurning
     waitStartedTime=time.time()
     lastTurn = currentTarget.lastDirection
     print('current mode changed to nearsearching at ',waitStartedTime)
@@ -411,12 +430,16 @@ def RegisterTarget(trk: tracker.Tracker, img):
         print('register target error')
         raise
 
+isPreviousStandTurn = False
+
 def newRawDrive():
     global move
     global currentTurn
     global lastObstacleDirection
     global lastObstacleScore
     global lastFrontLidarData
+    global isPreviousStandTurn
+    global currentRideMode
     #print('newRawDrive enter. width : ', W)
 
 
@@ -447,6 +470,7 @@ def newRawDrive():
 
     move.angular.z = pos * -0.5
 
+    #대충 중앙에 있으면 헛 회전 X
     if(currentTurn == Direction.Center):
         move.angular.z = 0
 
@@ -463,6 +487,7 @@ def newRawDrive():
             move.angular.z += -1 * lastObstacleScore
         else:
             move.angular.z += lastObstacleScore
+        isPreviousStandTurn = True
     if (distance < 500 and currentMode == Mode.Chasing):
         #print("so close. no turn")
         move.angular.z = 0
@@ -488,7 +513,7 @@ def standTurn(direction : Direction, isSleep = True):
     if(driveMode):
         pub.publish(move)
         if(isSleep):
-            time.sleep(1)
+            time.sleep(0.3)
 
 def DisposeTarget():
     global  currentTarget
