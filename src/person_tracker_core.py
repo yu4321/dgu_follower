@@ -19,7 +19,7 @@ import detector
 import tracker
 import cv2
 
-import os
+import os, time
 
 from enum import Enum
 
@@ -146,10 +146,14 @@ class PersonTrackerCore:
     def get_darknet_trackers(self, img, darknets : BoundingBoxes):
         good_tracker_list = []
 
+        logText=""
+        t=time.time()
         #print('get boxes ',len(darknets))
         self.callback_det(darknets)
+        logText+='callbackdet : '+str(time.time()-t)
         #print('callback det complete\n')
         self.callback_image(img, darknets)
+        logText+='callback_image : '+str(time.time()-t)
         #print('callbakc img complete\n')
         for track in self.tracker.tracks:
             if not track.is_confirmed() or track.time_since_update > 1:
@@ -167,7 +171,9 @@ class PersonTrackerCore:
             n.score = track.confidence
             # left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
             good_tracker_list.append(n)
-
+        logText+='append all end : '+str(time.time()-t)
+        #if(int(time.time()-t)>=1):
+            #print(logText)
         #print(good_tracker_list)
         # for box in darknets:
         #     n=tracker.Tracker()

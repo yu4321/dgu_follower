@@ -83,6 +83,8 @@ isWorking=False
 #마지막으로 감지된 라이다 데이터. 파이프라인과 무관하게 계속 갱신됨
 lastFrontLidarData : LidarData=None
 
+lastBackLidarData : LidarData= None
+
 lastImageData : Image = None
 lastYoloData : BoundingBoxes = None
 lastYoloAddedTime : time = None
@@ -158,30 +160,6 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
         ChangeModeToNearSearching()
         return img
 
-    # nowObsInfo = lastFrontLidarData.GetObstacleScore()
-    # print('cur obs : direction ',nowObsInfo.Direction, ', score : ',nowObsInfo.score)
-    # lastObstacleDirection = nowObsInfo.Direction
-    # lastObstacleScore = nowObsInfo.score
-    # if(nowObsInfo.score != 0) :
-    #     if (nowObsInfo.Direction == Direction.Center ):
-    #         # print('start large Stand Turn ',time.time())
-    #         # while(True):
-    #         #     standTurn(Direction.Left)
-    #         #     curObsInfo = lastFrontLidarData.GetObstacleScore()
-    #         #     if(curObsInfo.Direction==Direction.Center and curObsInfo.score != 0):
-    #         #         continue
-    #         #     else:
-    #         #         break
-    #         # print('end large Stand Turn ',time.time())
-    #     else:
-    #         lastObstacleDirection = nowObsInfo.Direction
-    #         lastObstacleScore = nowObsInfo.score
-    # else:
-    #     if(lastObstacleDirection!=Direction.Center):
-    #         lastObstacleDirection =Direction.Center
-
-    #장애물 로직은 newRawDrive에 우겨넣자
-
     if(driveMode):
         newRawDrive()
     #else:
@@ -229,7 +207,7 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     isFocusedMode=False
 
     if time.time() - waitStartedTime > 5:
-        #print('changed to isfocusedMode')
+        print('changed to isfocusedMode')
         isFocusedMode=True
 
     nearSearchingTurnCount += 1
@@ -264,21 +242,12 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        timediff=int(time.time() -waitStartedTime)
-        if (timediff%2 == 0):
-            standTurn(lastTurn, False)
-        else:
+        if(isFocusedMode):
             forceStop()
-        # if(isFocusedMode):
-        #     if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
-        #         standTurn(lastTurn, False)
-        #     else:
-        #         forceStop()
-        # else:
-        #     standTurn(lastTurn)
+        else:
+            standTurn(lastTurn, False)
         if(time.time() - waitStartedTime > 10):
             ChangeModeToFarSearching()
-            #DisposeTarget()
     return img
 
 #메인 루프
@@ -301,11 +270,7 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
         return img
 
     isWorking=True
-    # if(lastFrontLidarData!=None):
-    #     nowObsInfo = lastFrontLidarData.GetObstacleScore()
-    #     print('cur obs : direction ',nowObsInfo.Direction, ', score : ',nowObsInfo.score)
-    #     lastObstacleDirection = nowObsInfo.Direction
-    #     lastObstacleScore = nowObsInfo.score
+
     if(currentTarget==None):
         img= preTargetLoop(img,depth_img,darknets)
     else:
@@ -380,13 +345,14 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
     global isUsingColorSorter
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
-    if (trk.score > detectBaseScore and tDistance <= max(5000, currentTarget.latestDistance)):
-        if(toFast):
-            if(currentTarget.latestTracker.id == trk.id):
-                return True
-            else:
-                return False
-        if(isUsingColorSorter == False):
+    if (trk.score > detectBaseScore and tDistance <= max(2000, currentTarget.latestDistance)):
+
+        # if(toFast):
+        #     if(currentTarget.latestTracker.id == trk.id):
+        #         return True
+        #     else:
+        #         return False
+        if(isUsingColorSorter == False or toFast == True):
             return True
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
@@ -471,6 +437,7 @@ def newRawDrive():
     global lastObstacleDirection
     global lastObstacleScore
     global lastFrontLidarData
+    global lastBackLidarData
     global isPreviousStandTurn
     global currentRideMode
     #print('newRawDrive enter. width : ', W)
@@ -494,9 +461,13 @@ def newRawDrive():
             currentTurn = Direction.Left
     #print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
 
+    tryMoveBack=False
     if (distance < 500):
         #print("so close. stop")
         move.linear.x = 0
+        if(distance<200):
+            print('turn on back mode')
+            tryMoveBack=True
     else:
         move.linear.x=0.4
     TryBoost(distance)
@@ -512,7 +483,7 @@ def newRawDrive():
         if(currentLidar.Direction == Direction.Right):
             standTurn(Direction.Right, False)
         else:
-            if(currentLidar.Direction == Direction.Front and currentTurn == Center):
+            if(currentLidar.Direction == Direction.Center and currentTurn == Direction.Center):
                 return
             else:
                 standTurn(Direction.Left, False)
@@ -527,6 +498,12 @@ def newRawDrive():
     if (distance < 500 and currentMode == Mode.Chasing):
         #print("so close. no turn")
         move.angular.z = 0
+
+    if(move.linear.x ==0 and move.angular.z ==0 and tryMoveBack==True):
+        currentBack=lastBackLidarData.GetObstacleScore()
+        print('try move back - ',currentBack.score, currentBack.Direction)
+        if(currentBack.score==0):
+            move.linear.x = -0.2
     pub.publish(move)
     return
 
@@ -549,7 +526,7 @@ def standTurn(direction : Direction, isSleep = True):
     if(driveMode):
         pub.publish(move)
         if(isSleep):
-            time.sleep(0.3)
+            time.sleep(0.5)
 
 def forceStop():
     global move
@@ -573,6 +550,10 @@ def f_lidar_callback(data):
     global lastFrontLidarData
     #print('lidar data plus')
     lastFrontLidarData= LidarData(data.ranges)
+
+def r_lidar_callback(data):
+    global lastBackLidarData
+    lastBackLidarData=LidarData(data.ranges)
 
 def darknet_callback(data):
     global lastYoloData
@@ -616,6 +597,7 @@ if __name__ == "__main__":
         print('node inited')
         pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
         subLidarF = rospy.Subscriber("laser_f/scan", LaserScan, f_lidar_callback)
+        subLidarR = rospy.Subscriber("laser_r/scan", LaserScan, r_lidar_callback)
         darknetY=rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, darknet_callback)
         detImage=rospy.Subscriber('/camera/color/image_raw', Image, detImage_callback)
         depImage=rospy.Subscriber('/camera/depth/image_rect_raw', Image,depImage_callback)
