@@ -98,7 +98,7 @@ def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
     global currentMode
 
     if(darknets == None):
-        print('preTarget - darknet void')
+        #print('preTarget - darknet void')
         return img
 
     detects = trackerCore.get_darknet_trackers(img,darknets)
@@ -229,7 +229,9 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     isFocusedMode=False
 
     if time.time() - waitStartedTime > 5:
+        #print('changed to isfocusedMode')
         isFocusedMode=True
+
     nearSearchingTurnCount += 1
     isTargetFound=False
     if(darknets!=None):
@@ -262,13 +264,18 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        if(isFocusedMode):
-            if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
-                standTurn(lastTurn, False)
-            else:
-                forceStop()
+        timediff=int(time.time() -waitStartedTime)
+        if (timediff%2 == 0):
+            standTurn(lastTurn, False)
         else:
-            standTurn(lastTurn)
+            forceStop()
+        # if(isFocusedMode):
+        #     if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
+        #         standTurn(lastTurn, False)
+        #     else:
+        #         forceStop()
+        # else:
+        #     standTurn(lastTurn)
         if(time.time() - waitStartedTime > 10):
             ChangeModeToFarSearching()
             #DisposeTarget()
@@ -377,6 +384,8 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
         if(toFast):
             if(currentTarget.latestTracker.id == trk.id):
                 return True
+            else:
+                return False
         if(isUsingColorSorter == False):
             return True
         x_cv2 = trk.box
@@ -503,7 +512,10 @@ def newRawDrive():
         if(currentLidar.Direction == Direction.Right):
             standTurn(Direction.Right, False)
         else:
-            standTurn(Direction.Left, False)
+            if(currentLidar.Direction == Direction.Front and currentTurn == Center):
+                return
+            else:
+                standTurn(Direction.Left, False)
         return
 
     if(lastObstacleDirection == currentTurn):
