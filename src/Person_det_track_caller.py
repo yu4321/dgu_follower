@@ -85,6 +85,9 @@ lastDepthData : Image = None
 
 color =c2.colorSorter()
 
+
+isUsingColorSorter=True
+
 def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
     global currentFollow
     global currentMode
@@ -330,10 +333,12 @@ def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
         return True
 
 def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
+    global isUsingColorSorter
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
     if (trk.score > detectBaseScore and tDistance <= max(5000, currentTarget.latestDistance)):
-        #return True
+        if(isUsingColorSorter==False):
+            return True
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
         curImg = img[top:bottom, left:right]
@@ -385,7 +390,7 @@ def IsArraysTolarable(n1, n2):
 
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
-
+    global isUsingColorSorter
     try:
         currentTarget = target.Target()
         currentTarget.firstTracker = trk
@@ -395,9 +400,10 @@ def RegisterTarget(trk: tracker.Tracker, img):
 
         currentTarget.firstImg = img[top:bottom, left:right]
         currentTarget.lastImg=currentTarget.firstImg;
-        t = time.time()
-        currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
-        print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
+        if(isUsingColorSorter):
+            t = time.time()
+            currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
+            print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
         print('target registered : ', trk.id)
 
         #cv2.imshow('target - '+str(currentTarget.firstColors),currentTarget.firstImg)
