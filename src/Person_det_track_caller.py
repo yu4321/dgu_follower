@@ -227,6 +227,9 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     if(darknets!=None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
         trk: tracker.Tracker
+        minn =min(detects, key=lambda x: tcore.get_biggest_distance_of_box(depth_img,trk))
+        print('only candidate : ',minn.id)
+        onlyCandidate=minn.id
         for trk in detects:
             x_cv2 = trk.box
             #print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
@@ -236,6 +239,8 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if(isTargetFound==False):
+                if(onlyCandidate!=trk.id):
+                    continue
                 if (ReidentifyTarget(trk, img, depth_img)):
                     isTargetFound=True
                     RefreshTargetData(trk, img, depth_img)
