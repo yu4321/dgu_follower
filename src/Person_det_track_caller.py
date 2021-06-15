@@ -335,6 +335,7 @@ def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
     x_cv2 = trk.box
     left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
     currentTarget.lastImg= img[top:bottom, left:right]
+    currentTarget.lastImages.append(currentTarget.lastImg)
     currentTarget.latestTracker = trk
 
     tDistance = tcore.get_biggest_distance_of_box(depth_img,trk)
@@ -366,31 +367,34 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
         t = time.time()
         tryColor = color.img_crop(curImg)
 
-        n1=np.array(currentTarget.firstColors)
+        lastColor = color.img_crop(currentTarget.lastImages[0])
+        n1 = np.array(lastColor)
+
         n2= np.array(tryColor)
         idx=0
-        for x in n1:
-            if(n1[idx] == 0):
-                n1[idx] = n2[idx]
-            idx+=1
-        idx=0
-        for x in n2:
-            if(n2[idx] == 0):
-                n2[idx] = n1[idx]
-            idx+=1
+        # for x in n1:
+        #     if(n1[idx] == 0):
+        #         n1[idx] = n2[idx]
+        #     idx+=1
+        # idx=0
+        # for x in n2:
+        #     if(n2[idx] == 0):
+        #         n2[idx] = n1[idx]
+        #     idx+=1
 
         res = IsArraysTolarable(n1,n2)
         if(res == True):
             print('succeed compare : ',n1,n2)
             return res
         else:
-            lastColor = color.img_crop(currentTarget.lastImg)
-            n1 = np.array(lastColor)
-            idx = 0
-            for x in n1:
-                if (n1[idx] == 0):
-                    n1[idx] = n2[idx]
-                idx += 1
+            n1 = np.array(currentTarget.firstColors)
+            # lastColor = color.img_crop(currentTarget.lastImages[0])
+            # n1 = np.array(lastColor)
+            # idx = 0
+            # for x in n1:
+            #     if (n1[idx] == 0):
+            #         n1[idx] = n2[idx]
+            #     idx += 1
         res= IsArraysTolarable(n1,n2)
         if(res):
             print('succeed 2nd compare : ', n1, n2)

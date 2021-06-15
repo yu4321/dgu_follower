@@ -2,6 +2,7 @@ import tracker
 import uuid
 import time
 from person_tracker_core import Direction
+from collections import deque
 import numpy as np
 
 
@@ -10,6 +11,7 @@ class Target():
     def __init__(self):
         self.firstImg = []
         self.lastImg=[]
+        self.lastImages=deque(maxlen = 60)
         self.firstTracker: tracker.Tracker = None
         self.latestTracker: tracker.Tracker = None
         self.latestDistance: float = 0
