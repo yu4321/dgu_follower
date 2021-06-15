@@ -68,6 +68,8 @@ lastObsTurn : Direction = Direction.Center
 lastObstacleDirection : Direction = Direction.Center
 lastObstacleScore = 0
 
+nearSearchingTurnCount=0
+
 #현재 작동 모드
 currentMode: Mode = Mode.Chasing
 currentRideMode : RideMode = RideMode.Normal
@@ -223,13 +225,22 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
     global waitStartedTime
     global lastTurn
     global nearSearchingTurnCount
+
+    isFocusedMode=False
+
+    if time.time() - waitStartedTime > 5:
+        isFocusedMode=True
+    nearSearchingTurnCount += 1
     isTargetFound=False
     if(darknets!=None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
         trk: tracker.Tracker
-        minn =min(detects, key=lambda x: tcore.get_biggest_distance_of_box(depth_img,trk))
-        print('only candidate : ',minn.id)
-        onlyCandidate=minn.id
+        onlyCandidate=-1
+        if(len(detects)>0 and isFocusedMode):
+            minn = min(detects, key=lambda x: tcore.get_biggest_distance_of_box(depth_img, x))
+            print('only candidate : ', minn.id)
+            onlyCandidate = minn.id
+
         for trk in detects:
             x_cv2 = trk.box
             #print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
@@ -239,9 +250,9 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if(isTargetFound==False):
-                if(onlyCandidate!=trk.id):
+                if(onlyCandidate!=-1 and onlyCandidate!=trk.id):
                     continue
-                if (ReidentifyTarget(trk, img, depth_img)):
+                if (ReidentifyTarget(trk, img, depth_img, not isFocusedMode)):
                     isTargetFound=True
                     RefreshTargetData(trk, img, depth_img)
                     ChangeModeToChasing()
@@ -251,12 +262,13 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
     if(isTargetFound == False):
-        if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
-            print('standturn ns, count ',nearSearchingTurnCount)
-            standTurn(lastTurn, False)
+        if(isFocusedMode):
+            if(nearSearchingTurnCount % 30 > 10 and nearSearchingTurnCount % 30 <25):
+                standTurn(lastTurn, False)
+            else:
+                forceStop()
         else:
-            forceStop()
-        nearSearchingTurnCount += 1
+            standTurn(lastTurn)
         if(time.time() - waitStartedTime > 10):
             ChangeModeToFarSearching()
             #DisposeTarget()
@@ -317,8 +329,6 @@ def ChangeModeToFarSearching():
     waitStartedTime=time.time()
     print('current mode changed to farsearching at ',waitStartedTime)
 
-nearSearchingTurnCount=0
-
 def ChangeModeToNearSearching():
     global currentMode
     global currentRideMode
@@ -359,11 +369,14 @@ def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
     if(trk.score > detectBaseScore and ttDistance<5000):
         return True
 
-def ReidentifyTarget(trk : tracker.Tracker, img, depth_img):
+def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
     global isUsingColorSorter
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
     if (trk.score > detectBaseScore and tDistance <= max(5000, currentTarget.latestDistance)):
+        if(toFast):
+            if(currentTarget.latestTracker.id == trk.id):
+                return True
         if(isUsingColorSorter == False):
             return True
         x_cv2 = trk.box
