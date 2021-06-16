@@ -14,7 +14,6 @@ cwd = os.path.dirname(os.path.realpath(__file__))
 tf.disable_v2_behavior()
 # Uncomment the following two lines if need to use the visualization_tunitls
 #os.chdir(cwd+'/models')
-import visualization_utils
 
 class DetectedBox(object):
     def __init__(self, box, score):
@@ -72,7 +71,7 @@ class PersonDetector(object):
         box_pixel = [int(box[0]*height), int(box[1]*width), int(box[2]*height), int(box[3]*width)]
         return np.array(box_pixel)       
         
-    def get_localization(self, image, visual=False):  
+    def get_localization(self, image):
         """Determines the locations of the traffic light in the image
 
         Args:
@@ -101,21 +100,7 @@ class PersonDetector(object):
               (boxes, scores, classes, num_detections) = self.sess.run(
                   [self.boxes, self.scores, self.classes, self.num_detections],
                   feed_dict={self.image_tensor: image_expanded})
-          
-              if visual == True:
-                  visualization_utils.visualize_boxes_and_labels_on_image_array(
-                      image,
-                      np.squeeze(boxes),
-                      np.squeeze(classes).astype(np.int32),
-                      np.squeeze(scores),
-                      category_index,
-                      use_normalized_coordinates=True,min_score_thresh=.4,
-                      line_thickness=3)
-    
-                  plt.figure(figsize=(9,6))
-                  plt.imshow(image)
-                  plt.show()  
-              
+
               boxes=np.squeeze(boxes)
               classes =np.squeeze(classes)
               scores = np.squeeze(scores)

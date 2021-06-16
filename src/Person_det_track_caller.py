@@ -37,84 +37,84 @@ detectBaseScore = 0.3
 
 # 얘네 둘은 무시
 # Global variables to be used by funcitons of VideoFileClop
-frame_count = 0 # frame counter
+frame_count = 0  # frame counter
 
 debug = False
 
 driveMode = True
 
-#현재 추적하는 물체의 Object ID
+# 현재 추적하는 물체의 Object ID
 currentFollow = int
 
-#현재 진짜로 추적하는 물체
-currentTarget:target.Target = None
+# 현재 진짜로 추적하는 물체
+currentTarget: target.Target = None
 
-#추적 메인 모듈
+# 추적 메인 모듈
 trackerCore = tcore.PersonTrackerCore()
 
-#로스파이 이미지에서 오픈씨비 이미지로 변환
+# 로스파이 이미지에서 오픈씨비 이미지로 변환
 ncv2 = CvBridge()
 
-#마지막 최소 거리값. 측정 안될때 재사용하려고
+# 마지막 최소 거리값. 측정 안될때 재사용하려고
 lastMin = float("inf")
 
-#현재의 회전 방향. rawDrive면 안 씀
-currentTurn : Direction = Direction.Center
-#마지막 회전 방향. rawDrive면 안 씀
-lastTurn : Direction = Direction.Center
+# 현재의 회전 방향. rawDrive면 안 씀
+currentTurn: Direction = Direction.Center
+# 마지막 회전 방향. rawDrive면 안 씀
+lastTurn: Direction = Direction.Center
 
-lastObsTurn : Direction = Direction.Center
+lastObsTurn: Direction = Direction.Center
 
-lastObstacleDirection : Direction = Direction.Center
+lastObstacleDirection: Direction = Direction.Center
 lastObstacleScore = 0
 
-nearSearchingTurnCount=0
+nearSearchingTurnCount = 0
 
-#현재 작동 모드
+# 현재 작동 모드
 currentMode: Mode = Mode.Chasing
-currentRideMode : RideMode = RideMode.Normal
+currentRideMode: RideMode = RideMode.Normal
 
-#소실 후 타겟 파기까지 30초 기다릴 때 쓰는 변수
+# 소실 후 타겟 파기까지 30초 기다릴 때 쓰는 변수
 waitStartedTime: time = None
 
-#pipeline 중복 실행 방지용
-isWorking=False
+# pipeline 중복 실행 방지용
+isWorking = False
 
-#마지막으로 감지된 라이다 데이터. 파이프라인과 무관하게 계속 갱신됨
-lastFrontLidarData : LidarData=None
+# 마지막으로 감지된 라이다 데이터. 파이프라인과 무관하게 계속 갱신됨
+lastFrontLidarData: LidarData = None
 
-lastBackLidarData : LidarData= None
+lastBackLidarData: LidarData = None
 
-lastImageData : Image = None
-lastYoloData : BoundingBoxes = None
-lastYoloAddedTime : time = None
-lastDepthData : Image = None
+lastImageData: Image = None
+lastYoloData: BoundingBoxes = None
+lastYoloAddedTime: time = None
+lastDepthData: Image = None
 
-color =c2.colorSorter()
+color = c2.colorSorter()
+
+isUsingColorSorter = True
 
 
-isUsingColorSorter=True
-
-def preTargetLoop(img, depth_img, darknets:BoundingBoxes):
+def preTargetLoop(img, depth_img, darknets: BoundingBoxes):
     global currentFollow
     global currentMode
 
-    if(darknets == None):
-        #print('preTarget - darknet void')
+    if (darknets == None):
+        # print('preTarget - darknet void')
         return img
 
-    detects = trackerCore.get_darknet_trackers(img,darknets)
+    detects = trackerCore.get_darknet_trackers(img, darknets)
     trk: tracker.Tracker
     for trk in detects:
         x_cv2 = trk.box
         # print('pt cur box : ',trk.box, ', id : ',trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
-            #print('pt box not valid ', trk.box)
+            # print('pt box not valid ', trk.box)
             continue
         # 현재 타겟이 없을 경우 : 타겟 획득 행동
         if (currentTarget == None):
-            if (IdentifyTarget(trk,img, depth_img)):
+            if (IdentifyTarget(trk, img, depth_img)):
                 RegisterTarget(trk, img)
                 ChangeModeToChasing()
                 currentFollow = trk.id
@@ -143,10 +143,10 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
     trk: tracker.Tracker
     for trk in detects:
         x_cv2 = trk.box
-        #print('cl cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+        # print('cl cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
         # 사용 불가 박스는 넘김
         if (trk.isBoxValid() == False):
-            #print('cl box not valid ', trk.box)
+            # print('cl box not valid ', trk.box)
             continue
         if (trk.id == currentFollow):
             isIdLost = False
@@ -160,14 +160,15 @@ def chasingLoop(img, depth_img, darknets: BoundingBoxes):
         ChangeModeToNearSearching()
         return img
 
-    if(driveMode):
+    if (driveMode):
         newRawDrive()
-    #else:
-        #print('no drive mode')
+    # else:
+    # print('no drive mode')
 
     return img
 
-def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
+
+def farSearchingLoop(img, depth_img, darknets: BoundingBoxes):
     global currentTarget
     global currentFollow
     global waitStartedTime
@@ -177,10 +178,10 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
         trk: tracker.Tracker
         for trk in detects:
             x_cv2 = trk.box
-            #print('fs cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+            # print('fs cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
             # 사용 불가 박스는 넘김
             if (trk.isBoxValid() == False):
-                #print('fs box not valid ', trk.box)
+                # print('fs box not valid ', trk.box)
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
             if (isTargetFound == False):
@@ -193,47 +194,48 @@ def farSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                     continue
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
-    if(time.time() - waitStartedTime > 30):
+    if (time.time() - waitStartedTime > 30):
         DisposeTarget()
     return img
 
-def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
+
+def nearSearchingLoop(img, depth_img, darknets: BoundingBoxes):
     global currentTarget
     global currentFollow
     global waitStartedTime
     global lastTurn
     global nearSearchingTurnCount
 
-    isFocusedMode=False
+    isFocusedMode = False
 
     if time.time() - waitStartedTime > 5:
         print('changed to isfocusedMode')
-        isFocusedMode=True
+        isFocusedMode = True
 
     nearSearchingTurnCount += 1
-    isTargetFound=False
-    if(darknets!=None):
+    isTargetFound = False
+    if (darknets != None):
         detects = trackerCore.get_darknet_trackers(img, darknets)
         trk: tracker.Tracker
-        onlyCandidate=-1
-        if(len(detects)>0 and isFocusedMode):
+        onlyCandidate = -1
+        if (len(detects) > 0 and isFocusedMode):
             minn = min(detects, key=lambda x: tcore.get_biggest_distance_of_box(depth_img, x))
             print('only candidate : ', minn.id)
             onlyCandidate = minn.id
 
         for trk in detects:
             x_cv2 = trk.box
-            #print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
+            # print('ns cur box : ', trk.box, ', id : ', trk.id, ' score:', trk.score)
             # 사용 불가 박스는 넘김
             if (trk.isBoxValid() == False):
-                #print('ns box not valid ', trk.box)
+                # print('ns box not valid ', trk.box)
                 continue
             # 현재 타겟이 없을 경우 : 타겟 획득 행동
-            if(isTargetFound==False):
-                if(onlyCandidate!=-1 and onlyCandidate!=trk.id):
+            if (isTargetFound == False):
+                if (onlyCandidate != -1 and onlyCandidate != trk.id):
                     continue
                 if (ReidentifyTarget(trk, img, depth_img, not isFocusedMode)):
-                    isTargetFound=True
+                    isTargetFound = True
                     RefreshTargetData(trk, img, depth_img)
                     ChangeModeToChasing()
                     currentFollow = trk.id
@@ -241,19 +243,20 @@ def nearSearchingLoop(img, depth_img, darknets:BoundingBoxes):
                     continue
             img = helpers.draw_box_label(trk.id, img, x_cv2)
 
-    if(isTargetFound == False):
-        if(isFocusedMode):
+    if (isTargetFound == False):
+        if (isFocusedMode):
             forceStop()
         else:
             standTurn(lastTurn, False)
-        if(time.time() - waitStartedTime > 10):
+        if (time.time() - waitStartedTime > 10):
             ChangeModeToFarSearching()
     return img
 
-#메인 루프
-#받는 패러미터 : 이미지, 뎁스이미지, 다크넷 바운딩박스
-#반환값 : 표시할 이미지(사각형 그려놓은거)
-def pipeline(img, depth_img, darknets:BoundingBoxes):
+
+# 메인 루프
+# 받는 패러미터 : 이미지, 뎁스이미지, 다크넷 바운딩박스
+# 반환값 : 표시할 이미지(사각형 그려놓은거)
+def pipeline(img, depth_img, darknets: BoundingBoxes):
     global currentFollow
     global currentTarget
     global currentMode
@@ -263,25 +266,25 @@ def pipeline(img, depth_img, darknets:BoundingBoxes):
     global isWorking
     global lastObstacleDirection
     global lastObstacleScore
-    
-    #중복실행 방지
-    if(isWorking == True):
+
+    # 중복실행 방지
+    if (isWorking == True):
         print('atomic blocked')
         return img
 
-    isWorking=True
+    isWorking = True
 
-    if(currentTarget==None):
-        img= preTargetLoop(img,depth_img,darknets)
+    if (currentTarget == None):
+        img = preTargetLoop(img, depth_img, darknets)
     else:
-        if(currentMode == Mode.Chasing):
-            img= chasingLoop(img, depth_img,darknets)
+        if (currentMode == Mode.Chasing):
+            img = chasingLoop(img, depth_img, darknets)
         elif currentMode == Mode.FarSearching:
-            img= farSearchingLoop(img, depth_img,darknets)
+            img = farSearchingLoop(img, depth_img, darknets)
         elif currentMode == Mode.NearSearching:
             img = nearSearchingLoop(img, depth_img, darknets)
 
-    isWorking=False
+    isWorking = False
     return img
 
 
@@ -292,14 +295,16 @@ def ChangeModeToChasing():
     currentMode = Mode.Chasing
     currentRideMode = RideMode.Normal
 
+
 def ChangeModeToFarSearching():
     global currentMode
     global currentRideMode
     global waitStartedTime
     currentMode = Mode.FarSearching
     currentRideMode = RideMode.StandStill
-    waitStartedTime=time.time()
-    print('current mode changed to farsearching at ',waitStartedTime)
+    waitStartedTime = time.time()
+    print('current mode changed to farsearching at ', waitStartedTime)
+
 
 def ChangeModeToNearSearching():
     global currentMode
@@ -308,40 +313,42 @@ def ChangeModeToNearSearching():
     global lastTurn
     global currentTarget
     global nearSearchingTurnCount
-    nearSearchingTurnCount=0
+    nearSearchingTurnCount = 0
     currentMode = Mode.NearSearching
-    #currentRideMode = RideMode.StandTurning
-    waitStartedTime=time.time()
+    # currentRideMode = RideMode.StandTurning
+    waitStartedTime = time.time()
     lastTurn = currentTarget.lastDirection
-    print('current mode changed to nearsearching at ',waitStartedTime)
+    print('current mode changed to nearsearching at ', waitStartedTime)
 
 
-def RefreshTargetData(trk:tracker.Tracker, img, depth_img):
+def RefreshTargetData(trk: tracker.Tracker, img, depth_img):
     global currentTarget
     global lastMin
     x_cv2 = trk.box
     left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
-    currentTarget.lastImg= img[top:bottom, left:right]
+    currentTarget.lastImg = img[top:bottom, left:right]
     currentTarget.lastImages.append(currentTarget.lastImg)
     currentTarget.latestTracker = trk
 
-    tDistance = tcore.get_biggest_distance_of_box(depth_img,trk)
-    if(tDistance ==0):
+    tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
+    if (tDistance == 0):
         currentTarget.latestDistance = lastMin
     else:
         currentTarget.latestDistance = tDistance
-        lastMin=tDistance
+        lastMin = tDistance
     currentTarget.lastDirection = trackerCore.GetDirectionOfTracker(trk)
     return
 
+
 def IdentifyTarget(trk: tracker.Tracker, img, depth_img):
-    if(getTargetInNextFrame==False):
+    if (getTargetInNextFrame == False):
         return False
     ttDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
-    if(trk.score > detectBaseScore and ttDistance<5000):
+    if (trk.score > detectBaseScore and ttDistance < 5000):
         return True
 
-def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
+
+def ReidentifyTarget(trk: tracker.Tracker, img, depth_img, toFast=False):
     global isUsingColorSorter
     tDistance = tcore.get_biggest_distance_of_box(depth_img, trk)
 
@@ -352,7 +359,7 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
         #         return True
         #     else:
         #         return False
-        if(isUsingColorSorter == False or toFast == True):
+        if (isUsingColorSorter == False or toFast == True):
             return True
         x_cv2 = trk.box
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
@@ -363,8 +370,8 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
         lastColor = color.img_crop(currentTarget.lastImages[0])
         n1 = np.array(lastColor)
 
-        n2= np.array(tryColor)
-        idx=0
+        n2 = np.array(tryColor)
+        idx = 0
         # for x in n1:
         #     if(n1[idx] == 0):
         #         n1[idx] = n2[idx]
@@ -375,9 +382,9 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
         #         n2[idx] = n1[idx]
         #     idx+=1
 
-        res = IsArraysTolarable(n1,n2)
-        if(res == True):
-            print('succeed compare : ',n1,n2)
+        res = IsArraysTolarable(n1, n2)
+        if (res == True):
+            print('succeed compare : ', n1, n2)
             return res
         else:
             n1 = np.array(currentTarget.firstColors)
@@ -388,23 +395,25 @@ def ReidentifyTarget(trk : tracker.Tracker, img, depth_img, toFast=False):
             #     if (n1[idx] == 0):
             #         n1[idx] = n2[idx]
             #     idx += 1
-        res= IsArraysTolarable(n1,n2)
-        if(res):
+        res = IsArraysTolarable(n1, n2)
+        if (res):
             print('succeed 2nd compare : ', n1, n2)
             return True
         else:
             return False
     return False
 
+
 def IsArraysTolarable(n1, n2):
-    arrp=[]
-    for i in range(0,4):
-        arrp.append(abs(int(n1[i])-int(n2[i])))
-    arr= np.array(arrp)
-    if(np.max(arr)<=30):
+    arrp = []
+    for i in range(0, 4):
+        arrp.append(abs(int(n1[i]) - int(n2[i])))
+    arr = np.array(arrp)
+    if (np.max(arr) <= 30):
         return True
     else:
         return False
+
 
 def RegisterTarget(trk: tracker.Tracker, img):
     global currentTarget
@@ -417,19 +426,21 @@ def RegisterTarget(trk: tracker.Tracker, img):
         left, top, right, bottom = x_cv2[1], x_cv2[0], x_cv2[3], x_cv2[2]
 
         currentTarget.firstImg = img[top:bottom, left:right]
-        currentTarget.lastImg=currentTarget.firstImg;
-        if(isUsingColorSorter):
+        currentTarget.lastImg = currentTarget.firstImg;
+        if (isUsingColorSorter):
             t = time.time()
-            currentTarget.firstColors=color.img_crop(currentTarget.firstImg)
-            print('color 4 crop time : ', time.time()- t, ', get color : ',currentTarget.firstColors)
+            currentTarget.firstColors = color.img_crop(currentTarget.firstImg)
+            print('color 4 crop time : ', time.time() - t, ', get color : ', currentTarget.firstColors)
         print('target registered : ', trk.id)
 
-        #cv2.imshow('target - '+str(currentTarget.firstColors),currentTarget.firstImg)
+        # cv2.imshow('target - '+str(currentTarget.firstColors),currentTarget.firstImg)
     except:
         print('register target error')
         raise
 
+
 isPreviousStandTurn = False
+
 
 def newRawDrive():
     global move
@@ -440,155 +451,165 @@ def newRawDrive():
     global lastBackLidarData
     global isPreviousStandTurn
     global currentRideMode
-    #print('newRawDrive enter. width : ', W)
-
+    # print('newRawDrive enter. width : ', W)
 
     trk = currentTarget.latestTracker
-    distance =currentTarget.latestDistance
+    distance = currentTarget.latestDistance
 
     half = W / 2
     center = trackerCore.GetCenterOfTracker(trk)
     posProto = center - half
     pos = posProto / half
 
-    #print('current pos ', pos)
-    if(abs(pos) <= 0.1):
+    # print('current pos ', pos)
+    if (abs(pos) <= 0.1):
         currentTurn = Direction.Center
     else:
-        if(pos>0):
+        if (pos > 0):
             currentTurn = Direction.Right
         else:
             currentTurn = Direction.Left
-    #print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
+    # print('rawdrive - currentTurn is ',currentTurn, 'current pos is ',pos)
 
-    tryMoveBack=False
+    tryMoveBack = False
     if (distance < 500):
-        #print("so close. stop")
+        # print("so close. stop")
         move.linear.x = 0
-        if(distance<200):
+        if (distance < 200):
             print('turn on back mode')
-            tryMoveBack=True
+            tryMoveBack = True
     else:
-        move.linear.x=0.4
+        move.linear.x = 0.4
     TryBoost(distance)
 
     move.angular.z = pos * -0.5
 
-    #대충 중앙에 있으면 헛 회전 X
-    if(currentTurn == Direction.Center):
+    # 대충 중앙에 있으면 헛 회전 X
+    if (currentTurn == Direction.Center):
         move.angular.z = 0
 
     currentLidar = lastFrontLidarData.GetObstacleScore()
-    if(currentLidar.score != 0 and distance >=500):
-        if(currentLidar.Direction == Direction.Right):
+    if (currentLidar.score != 0 and distance >= 500):
+        if (currentLidar.Direction == Direction.Right):
             standTurn(Direction.Right, False)
         else:
-            if(currentLidar.Direction == Direction.Center and currentTurn == Direction.Center):
+            if (currentLidar.Direction == Direction.Center and currentTurn == Direction.Center):
                 return
             else:
                 standTurn(Direction.Left, False)
         return
 
-    if(lastObstacleDirection == currentTurn):
-        if(currentTurn == Direction.Right):
+    if (lastObstacleDirection == currentTurn):
+        if (currentTurn == Direction.Right):
             move.angular.z += -1 * lastObstacleScore
         else:
             move.angular.z += lastObstacleScore
         isPreviousStandTurn = True
     if (distance < 500 and currentMode == Mode.Chasing):
-        #print("so close. no turn")
+        # print("so close. no turn")
         move.angular.z = 0
 
-    if(move.linear.x ==0 and move.angular.z ==0 and tryMoveBack==True):
-        currentBack=lastBackLidarData.GetObstacleScore()
-        print('try move back - ',currentBack.score, currentBack.Direction)
-        if(currentBack.score==0):
+    if (move.linear.x == 0 and move.angular.z == 0 and tryMoveBack == True):
+        currentBack = lastBackLidarData.GetObstacleScore()
+        print('try move back - ', currentBack.score, currentBack.Direction)
+        if (currentBack.score == 0):
             move.linear.x = -0.2
     pub.publish(move)
     return
 
+
 def TryBoost(distance):
     global move
-    if(move.linear.x <=0):
+    if (move.linear.x <= 0):
         return
-    difff = (distance - 500)/6000
-    if(difff > 0.5):
-        difff =0.5
+    difff = (distance - 500) / 6000
+    if (difff > 0.5):
+        difff = 0.5
     move.linear.x += difff
 
-def standTurn(direction : Direction, isSleep = True):
+
+def standTurn(direction: Direction, isSleep=True):
     global move
     if (direction == Direction.Right):
         move.angular.z = -0.5
     elif direction == Direction.Left:
         move.angular.z = 0.5
-    move.linear.x=0
-    if(driveMode):
+    move.linear.x = 0
+    if (driveMode):
         pub.publish(move)
-        if(isSleep):
+        if (isSleep):
             time.sleep(0.5)
+
 
 def forceStop():
     global move
-    move.angular.z=0
-    move.linear.x=0
-    if(driveMode):
+    move.angular.z = 0
+    move.linear.x = 0
+    if (driveMode):
         pub.publish(move)
 
+
 def DisposeTarget():
-    global  currentTarget
+    global currentTarget
     print('remove current target')
-    currentTarget=None
+    currentTarget = None
+
 
 def PrintCenterDistance(x, y, depth_img):
-    pix = (x/ 2, y / 2)
+    pix = (x / 2, y / 2)
     sys.stdout.write(
         'Depth at center(%d, %d): %f(mm)\r' % (pix[0], pix[1], depth_img[int(pix[1]), int(pix[0])]))
     sys.stdout.flush()
 
+
 def f_lidar_callback(data):
     global lastFrontLidarData
-    #print('lidar data plus')
-    lastFrontLidarData= LidarData(data.ranges)
+    # print('lidar data plus')
+    lastFrontLidarData = LidarData(data.ranges)
+
 
 def r_lidar_callback(data):
     global lastBackLidarData
-    lastBackLidarData=LidarData(data.ranges)
+    lastBackLidarData = LidarData(data.ranges)
+
 
 def darknet_callback(data):
     global lastYoloData
     global lastYoloAddedTime
-    lastYoloData=data
-    lastYoloAddedTime=time.time()
-    #print('yolo data plus')
+    lastYoloData = data
+    lastYoloAddedTime = time.time()
+    # print('yolo data plus')
+
 
 def detImage_callback(data):
     global lastImageData
-    lastImageData=data
-    #print('image data plus')
+    lastImageData = data
+    # print('image data plus')
+
 
 def depImage_callback(data):
     global lastDepthData
-    lastDepthData=data
-    #print('depth data plus')
+    lastDepthData = data
+    # print('depth data plus')
 
-getTargetInNextFrame=False
+
+getTargetInNextFrame = False
 
 if __name__ == "__main__":
-    print('current path : ',os.getcwd())
-    currentFollow=-1
-    driveMode=True
+    print('current path : ', os.getcwd())
+    currentFollow = -1
+    driveMode = True
     det = detector.PersonDetector()
 
-    if debug: # test on a sequence of images
+    if debug:  # test on a sequence of images
         images = [plt.imread(file) for file in glob.glob('./test_images/*.jpg')]
-        
+
         for i in range(len(images))[0:7]:
-             image = images[i]
-             image_box = pipeline(image)   
-             plt.imshow(image_box)
-             plt.show()
-           
+            image = images[i]
+            image_box = pipeline(image)
+            plt.imshow(image_box)
+            plt.show()
+
     else:
         print('main started')
         move = Twist()
@@ -598,16 +619,16 @@ if __name__ == "__main__":
         pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
         subLidarF = rospy.Subscriber("laser_f/scan", LaserScan, f_lidar_callback)
         subLidarR = rospy.Subscriber("laser_r/scan", LaserScan, r_lidar_callback)
-        darknetY=rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, darknet_callback)
-        detImage=rospy.Subscriber('/camera/color/image_raw', Image, detImage_callback)
-        depImage=rospy.Subscriber('/camera/depth/image_rect_raw', Image,depImage_callback)
+        darknetY = rospy.Subscriber('/darknet_ros/bounding_boxes', BoundingBoxes, darknet_callback)
+        detImage = rospy.Subscriber('/camera/color/image_raw', Image, detImage_callback)
+        depImage = rospy.Subscriber('/camera/depth/image_rect_raw', Image, depImage_callback)
         print('published')
 
         print('will start loop now')
 
         frame_rate = 10
         prev = 0
-        while(True):
+        while (True):
             if rospy.is_shutdown():
                 break
             time_elapsed = time.time() - prev
@@ -624,42 +645,40 @@ if __name__ == "__main__":
             #     darknets= rospy.wait_for_message('/darknet_ros/bounding_boxes', BoundingBoxes, 1)
             # except:
             #     darknets=None
-            #print(darknets)
+            # print(darknets)
 
-
-            msg=lastImageData
-            data =lastDepthData
-            darknets=lastYoloData
-
+            msg = lastImageData
+            data = lastDepthData
+            darknets = lastYoloData
 
             if msg == None or data == None:
                 continue
 
             if lastYoloAddedTime != None:
-                if(time.time() - lastYoloAddedTime < 0.5):
+                if (time.time() - lastYoloAddedTime < 0.5):
                     darknets = lastYoloData
                 else:
-                    darknets=None
+                    darknets = None
 
-            start=time.time()
-            img=ncv2.imgmsg_to_cv2(msg, "bgr8")
+            start = time.time()
+            img = ncv2.imgmsg_to_cv2(msg, "bgr8")
             cv_image = ncv2.imgmsg_to_cv2(data, data.encoding)
             endcv2 = time.time() - start
 
-            W=int(data.width)
-            H=int(data.height)
+            W = int(data.width)
+            H = int(data.height)
             tcore.W = W
             tcore.H = H
 
-            #PrintCenterDistance(W,H,cv_image)
+            # PrintCenterDistance(W,H,cv_image)
 
             start = time.time()
-            if(darknets == None):
-                new_img = pipeline(img,cv_image,None)
+            if (darknets == None):
+                new_img = pipeline(img, cv_image, None)
             else:
                 new_img = pipeline(img, cv_image, darknets.bounding_boxes)
-            endpipeline=time.time()-start
-            getTargetInNextFrame=False
+            endpipeline = time.time() - start
+            getTargetInNextFrame = False
             start = time.time()
             try:
                 cv2.imshow('frame', new_img)
@@ -667,10 +686,10 @@ if __name__ == "__main__":
                 print('exception show')
                 continue
 
-            endimshow=time.time()-start
+            endimshow = time.time() - start
 
             sys.stdout.write(
-                'Time: cv2 %f, pipeline %f, imshow %f\r' % (endcv2,endpipeline,endimshow))
+                'Time: cv2 %f, pipeline %f, imshow %f\r' % (endcv2, endpipeline, endimshow))
             sys.stdout.flush()
 
             pressed = cv2.waitKey(1) & 0xFF
@@ -679,16 +698,16 @@ if __name__ == "__main__":
             # if input:
             #     p2 = sys.stdin.readline().rstrip()
 
-            if pressed== ord('q'): #or p2 == 'q':
+            if pressed == ord('q'):  # or p2 == 'q':
                 print('exit with q')
                 break
-            if pressed == ord('s'):# or p2 == 's':
-                driveMode= not driveMode
-                print('drive mode change to '+str(driveMode))
+            if pressed == ord('s'):  # or p2 == 's':
+                driveMode = not driveMode
+                print('drive mode change to ' + str(driveMode))
                 # if(driveMode == False):
                 #     DisposeTarget();
             if pressed == ord('d'):
-                if(currentTarget == None):
-                    getTargetInNextFrame=True
+                if (currentTarget == None):
+                    getTargetInNextFrame = True
                 else:
                     DisposeTarget()

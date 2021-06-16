@@ -111,7 +111,7 @@ class PersonTrackerCore:
             self.scores.append(float('%.2f' % box.probability))
         self.detections = np.array(self.detections)
 
-    def callback_image(self, cv_rgb, darknets : BoundingBoxes):
+    def callback_image(self, cv_rgb, darknets: BoundingBoxes):
         # Features and detections
         features = self.encoder(cv_rgb, self.detections)
         detections_new = [Detection(bbox, score, feature, orgBox) for bbox, score, feature, orgBox in
